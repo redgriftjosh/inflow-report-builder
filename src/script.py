@@ -3,8 +3,12 @@ import subprocess
 import os
 import json
 from threading import Thread
+from multiprocessing import Process
 
 app = Flask(__name__)
+
+def run_script(serialized_data, script_path):
+    subprocess.run(['python3', script_path, serialized_data])
 
 @app.route('/graph-to-pressure-sensor', methods=['POST'])
 def graph_to_pressure_sensor():
@@ -13,29 +17,20 @@ def graph_to_pressure_sensor():
     serialized_data = json.dumps(data)
 
     script_path = os.path.join('routes', 'graph-to-pressure-sensor.py')
-    completed_process = subprocess.run(['python3', script_path, serialized_data])
-
-    if completed_process.returncode == 0:
-        return jsonify(message="We did it!"), 200
-    else:
-        return jsonify(message="Sorry bout that one, boss..."), 500
+    p = Process(target=run_script, args=(serialized_data, script_path))
+    p.start()
 
 
 
 @app.route('/graph-to-ac', methods=['POST'])
 def graph_to_ac():
     data = request.get_json()
-    # print(f"Received data for /graph-to-ac: {data}")
 
     serialized_data = json.dumps(data)
     
     script_path = os.path.join('routes', 'graph-to-ac.py')
-    completed_process = subprocess.run(['python3', script_path, serialized_data])
-
-    if completed_process.returncode == 0:
-        return jsonify(message="Success!"), 200
-    else:
-        return jsonify(message="Looks like we might have potentially encountered a teeny weeny error..."), 500
+    p = Process(target=run_script, args=(serialized_data, script_path))
+    p.start()
 
 @app.route('/update-3-2', methods=['POST'])
 def update_3_2():
@@ -44,20 +39,11 @@ def update_3_2():
 
     script_path = os.path.join('routes', 'update-3-2.py')
 
-    def run_script():
-        subprocess.run(['python3', script_path, serialized_data])
-        
-    # completed_process = subprocess.run(['python3', script_path, serialized_data])
-
-    # Using Threat to provide a success message before running the script because it can take ~30 seconds to run the script and the user is locked down until success message
-    Thread(target=run_script).start()
+    p = Process(target=run_script, args=(serialized_data, script_path))
+    p.start()
 
     return jsonify(message="Success!"), 200
     
-    # if completed_process.returncode == 0:
-    #     return jsonify(message="Success!"), 200
-    # else:
-    #     return jsonify(message="Oh Jeez..."), 500
     
 @app.route('/update-3-1', methods=['POST'])
 def update_3_1():
@@ -65,21 +51,10 @@ def update_3_1():
     serialized_data = json.dumps(data)
 
     script_path = os.path.join('routes', 'update-3-1.py')
-
-    def run_script():
-        subprocess.run(['python3', script_path, serialized_data])
-        
-    # completed_process = subprocess.run(['python3', script_path, serialized_data])
-
-    # Using Threat to provide a success message before running the script because it can take ~30 seconds to run the script and the user is locked down until success message
-    Thread(target=run_script).start()
+    p = Process(target=run_script, args=(serialized_data, script_path))
+    p.start()
 
     return jsonify(message="Success!"), 200
-    
-    # if completed_process.returncode == 0:
-    #     return jsonify(message="Success!"), 200
-    # else:
-    #     return jsonify(message="Oh Jeez..."), 500
 
 @app.route('/update-3-3', methods=['POST'])
 def update_3_3():
@@ -87,18 +62,12 @@ def update_3_3():
     serialized_data = json.dumps(data)
 
     script_path = os.path.join('routes', 'update-3-3.py')
-
-    def run_script():
-        subprocess.run(['python3', script_path, serialized_data])
-        
-    # completed_process = subprocess.run(['python3', script_path, serialized_data])
-
-    # Using Threat to provide a success message before running the script because it can take ~30 seconds to run the script and the user is locked down until success message
-    Thread(target=run_script).start()
+    p = Process(target=run_script, args=(serialized_data, script_path))
+    p.start()
 
     return jsonify(message="Success!"), 200
-    
-    # if completed_process.returncode == 0:
-    #     return jsonify(message="Success!"), 200
-    # else:
-    #     return jsonify(message="Oh Jeez..."), 500
+
+
+# ONLY FOR TESTING LOCALLY COMMENT OUT WHEN DEPLOYING
+# if __name__ == '__main__':
+#     app.run(debug=True, port=3000)

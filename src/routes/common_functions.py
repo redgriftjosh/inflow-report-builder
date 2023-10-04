@@ -176,8 +176,6 @@ def daily_operating_period(df, operating_period_id):
     
     return period_data
 
-
-
 # return the number of hours within the operating periods per year.
 # function is special for the weekly operating periods.
 def hours_between_weekly(operating_period_id):
