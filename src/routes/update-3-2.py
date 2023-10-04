@@ -16,8 +16,7 @@ import common_functions
 data = json.loads(sys.argv[1]) # Proper Code. Keep this
 
 # next 2 lines are for running the code without the webhook. REPORT ID: 1696116368926x296884495425208300
-local_data = '{"report-id": "1696116368926x296884495425208300"}'
-data = json.loads(data)
+# local_data = '{"report-id": "1696116368926x296884495425208300"}'
 
 report_id = data.get('report-id')
 
