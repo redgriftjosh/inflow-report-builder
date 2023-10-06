@@ -25,7 +25,7 @@ else:
 report_id = data.get('report-id')
 
 print("Getting all data from common_functions.py")
-my_dict_compile_master = common_functions.compile_master_df(report_id)
+my_dict_compile_master = common_functions.compile_master_df(report_id, dev)
 
 operating_period_ids = my_dict_compile_master["operating_period_ids"]
 

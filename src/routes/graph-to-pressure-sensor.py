@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import base64
 import urllib.parse
+import numpy as np
 
 data = json.loads(sys.argv[1])
 
@@ -30,7 +31,7 @@ df.info()
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(
-    x=df.iloc[:, 1],
+    x=np.array(df.iloc[:, 1]),
     y=df.iloc[:, 2],
     mode='markers',  # 'markers' means it's a scatterplot
     marker=dict(size=5)

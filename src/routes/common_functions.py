@@ -41,7 +41,7 @@ def calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf):
 def calculate_olol_acfm(amps, thresholds, cfm):
     return 0 if amps < thresholds else cfm
 
-def calculate_slope_intercept(ac_json, cfm, volts):
+def calculate_slope_intercept(ac_json, cfm, volts, dev):
     rated_psig = ac_json["response"]["rated-psig"]
     setpoint_psig = ac_json["response"]["setpoint-psig"]
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
@@ -54,7 +54,7 @@ def calculate_slope_intercept(ac_json, cfm, volts):
     corrected_amps = []
     corrected_acfms = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd-slope-entries", slope_entry_id)
+        slope_json = get_req("vfd-slope-entries", slope_entry_id, dev)
         
         power_input_kw = slope_json["response"]["power-input-kw"]
         power_input_kws.append(power_input_kw)
@@ -87,8 +87,8 @@ def calculate_vfd_acfm(amps, slope, intercept):
     return amps * slope + intercept
 
 # gets start & end time for each day of the week returned in a dictionary.
-def weekly_dictionary(operating_period_id):
-    operating_period_json = get_req("Operation-Period", operating_period_id)
+def weekly_dictionary(operating_period_id, dev):
+    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
 
     days = ["sun", "mon", "tues", "wed", "thurs", "fri", "sat"] # for easily getting the data from bubble -- works with the naming convention
     large_days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] # for 
@@ -108,8 +108,8 @@ def weekly_dictionary(operating_period_id):
 
 # return the number of hours within the operating periods per year.
 # function is special for the daily operating periods.
-def hours_between(operating_period_id):
-    operating_period_json = get_req("Operation-Period", operating_period_id)
+def hours_between(operating_period_id, dev):
+    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     today = datetime.today()
@@ -127,8 +127,8 @@ def hours_between(operating_period_id):
 # takes one operation period id and then returns a filtered dataFrame within the user-defined days & times
 # to select a whole day, select 12am to 12am.
 # to select a start time to the end of the day, select start time normally and 12am end time.
-def weekly_operating_period(df, operating_period_id):
-    operating_period = weekly_dictionary(operating_period_id) # gets start & end time for each day of the week and stores in a dictionary.
+def weekly_operating_period(df, operating_period_id, dev):
+    operating_period = weekly_dictionary(operating_period_id, dev) # gets start & end time for each day of the week and stores in a dictionary.
 
     filtered_dfs = []
     for day, times in operating_period.items():
@@ -163,8 +163,8 @@ def weekly_operating_period(df, operating_period_id):
 
 # takes a dataframe and an operating period ID and returns a filtered dataframe.
 # Designed for daily operating period not weekly.
-def daily_operating_period(df, operating_period_id):
-    operating_period_json = get_req("Operation-Period", operating_period_id)
+def daily_operating_period(df, operating_period_id, dev):
+    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     operating_period = operating_period_json["response"]["Name"]
@@ -178,8 +178,8 @@ def daily_operating_period(df, operating_period_id):
 
 # return the number of hours within the operating periods per year.
 # function is special for the weekly operating periods.
-def hours_between_weekly(operating_period_id):
-    operating_period = weekly_dictionary(operating_period_id) # gets start & end time for each day of the week and stores in a dictionary.
+def hours_between_weekly(operating_period_id, dev):
+    operating_period = weekly_dictionary(operating_period_id, dev) # gets start & end time for each day of the week and stores in a dictionary.
 
     today = datetime.today()
     
@@ -213,10 +213,10 @@ def hours_between_weekly(operating_period_id):
     return total_hours_year
 
 # Returns an dictionary of pressure_id: csv_url designed for the pressure csvs in bubble
-def get_pressure_csvs(pressure_ids):
+def get_pressure_csvs(pressure_ids, dev):
     pressure_csvs = {}
     for pressure_id in pressure_ids:
-        pressure_json = get_req("pressure-sensor", pressure_id)
+        pressure_json = get_req("pressure-sensor", pressure_id, dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
@@ -245,10 +245,10 @@ def trim_df(report_json, df):
 
 # returns dictionary = {operating_period_id: {pressure_id: avg_pressure}, etc..}
 # currently don't have a front end setup to be able to varify pressure_ids tho...
-def get_avg_pressures(report_json):
+def get_avg_pressures(report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
-    pressure_csvs = get_pressure_csvs(pressure_ids) # Returns an dictionary = {pressure_id: csv_url, etc..}
+    pressure_csvs = get_pressure_csvs(pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
     operating_period_ids = report_json["response"]["Operation Period"] # array of operating_period_ids
     op_per_type = report_json["response"]["operating_period_type"] # can be "Daily" or "Weekly"
@@ -266,7 +266,7 @@ def get_avg_pressures(report_json):
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
                     df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
 
-                df = daily_operating_period(df, operating_period_id) # filter df by operating period
+                df = daily_operating_period(df, operating_period_id, dev) # filter df by operating period
                 avg_pressure = df.iloc[:, 2].mean()
                 avg_pressures[id] = avg_pressure
 
@@ -284,7 +284,7 @@ def get_avg_pressures(report_json):
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
                     df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
 
-                df = weekly_operating_period(df, operating_period_id) # filter df by operating period
+                df = weekly_operating_period(df, operating_period_id, dev) # filter df by operating period
                 avg_pressure = df.iloc[:, 2].mean()
                 avg_pressures[id] = avg_pressure
 
@@ -292,51 +292,9 @@ def get_avg_pressures(report_json):
     
     return op_per_avg_pressures
 
-                    
 
-
-            
-    
-    
-    ###########################################################################################################################################################
-    ###########################################################################################################################################################
-    if "pressure-sensor" in report_json["response"]:
-        pressure_ids = report_json["response"]["pressure-sensor"]
-        pressure_csvs = []
-        
-        op_per_avg_pressures = []
-        for start_time, end_time, period_name, period_id in zip(start_times, end_times, operating_periods, operating_period_ids):
-            avg_pressures = []
-
-            for pressure_csv, pressure_id in zip(pressure_csvs, pressure_ids):
-                response = requests.get(pressure_csv) # Step 2: Download the CSV file
-                response.raise_for_status() # Check that the request was successful
-                
-                csv_data = StringIO(response.text) # Convert CSV into text of some sort
-                
-                df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
-                
-                if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-                    df = df[(df.iloc[:, 1] >= trim_start) & (df.iloc[:, 1] <= trim_end)] # trim the df to be all synced up with other pressure csvs
-                
-                if start_time < end_time:
-                    period_data = df[(df.iloc[:, 1].dt.time >= start_time) & (df.iloc[:, 1].dt.time < end_time)]
-
-                else:  # Case for overnight period
-                    period_data = df[(df.iloc[:, 1].dt.time >= start_time) | (df.iloc[:, 1].dt.time < end_time)]
-
-                avg_pressure = period_data.iloc[:, 2].mean()
-                avg_pressures.append(avg_pressure)
-            op_per_avg_pressures.append(avg_pressures)
-        my_dict["op_per_avg_pressures"] = op_per_avg_pressures
-        print("Added: op_per_avg_pressures")
-
-        my_dict["pressure_ids"] = pressure_ids
-        print("Added: pressure_ids")
-            # update_pressure_in_bubble(period_id, avg_pressures)
-
-def compile_master_df(report_id, return_option=None):
-    report_json = get_req("Report", report_id)
+def compile_master_df(report_id, dev):
+    report_json = get_req("Report", report_id, dev)
     ac_ids = report_json["response"]["Air Compressor"]
 
     my_dict = {}
@@ -348,10 +306,10 @@ def compile_master_df(report_id, return_option=None):
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = get_req("Air-Compressor", ac)
+        ac_json = get_req("Air-Compressor", ac, dev)
         ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
 
-        ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id)
+        ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id, dev)
 
         csv_url = ac_data_logger_json["response"]["CSV"]
         csv_url = f"https:{csv_url}"
@@ -378,7 +336,7 @@ def compile_master_df(report_id, return_option=None):
             threshold = ac_json["response"]["threshold-value"]
             df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
         elif control == "VFD":
-            slope, intercept = calculate_slope_intercept(ac_json, cfm, volts)
+            slope, intercept = calculate_slope_intercept(ac_json, cfm, volts, dev)
             df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, slope, intercept))
         
         current_name_date = df.columns[1]
@@ -413,7 +371,7 @@ def compile_master_df(report_id, return_option=None):
         op_per_kpis = []
 
         for operating_period_id in operating_period_ids:
-            period_data = daily_operating_period(master_df, operating_period_id)
+            period_data = daily_operating_period(master_df, operating_period_id, dev)
 
             avg_acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
             avg_acfms.append(avg_acfm)
@@ -424,7 +382,7 @@ def compile_master_df(report_id, return_option=None):
             kpi = avg_kilowatts/avg_acfm
             op_per_kpis.append(kpi)
 
-            hours_diff = hours_between(operating_period_id)
+            hours_diff = hours_between(operating_period_id, dev)
             op_per_hours_betweens.append(hours_diff)
     elif op_per_type == "Weekly":
         avg_acfms = []
@@ -440,7 +398,7 @@ def compile_master_df(report_id, return_option=None):
             op_per_avg_kws.append(avg_kilowatts)
             kpi = avg_kilowatts/avg_acfm
             op_per_kpis.append(kpi)
-            hours_diff = hours_between_weekly(operating_period_id)
+            hours_diff = hours_between_weekly(operating_period_id, dev)
             op_per_hours_betweens.append(hours_diff)
         
 
@@ -515,58 +473,3 @@ def compile_master_df(report_id, return_option=None):
 
 
     return my_dict
-
-def testing():
-    report_json = get_req("Report", "1696116368926x296884495425208300")
-    ac_ids = report_json["response"]["Air Compressor"]
-
-    master_df = None
-    cfms = []
-    for idx, ac in enumerate(ac_ids):
-        ac_json = get_req("Air-Compressor", ac)
-        ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
-
-        ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id)
-
-        csv_url = ac_data_logger_json["response"]["CSV"]
-        csv_url = f"https:{csv_url}"
-
-        response = requests.get(csv_url) # Step 2: Download the CSV file
-        response.raise_for_status() # Check that the request was successful
-            
-        csv_data = StringIO(response.text) # Convert CSV into text of some sort
-        df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
-
-        volts = ac_json["response"]["volts"]
-        pf50 = ac_json["response"]["pf if fifty"]
-        pf = ac_json["response"]["pf"]
-        amppf = ac_json["response"]["amps less pf"]
-        bhp = ac_json["response"]["BHP"]
-        
-        df[f"Kilowatts{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
-
-        control = ac_json["response"]["Control Type"]
-        cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-        cfms.append(cfm)
-
-        if control == "OLOL":
-            threshold = ac_json["response"]["threshold-value"]
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = calculate_slope_intercept(ac_json, cfm, volts)
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, slope, intercept))
-        
-        current_name_date = df.columns[1]
-        current_name_num = df.columns[0]
-        current_name_amps = df.columns[2]
-        df.rename(columns={current_name_date: f"Date{idx+1}", current_name_num: f"Num{idx+1}", current_name_amps: f"Amps{idx+1}"}, inplace=True)
-
-        if master_df is None:
-            master_df = df
-            print("added first DataFrame to master_df")
-        else:
-            master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
-            print("Merged next Dataframe with master_df")
-
-
-    weekly_operating_period(master_df, "1696357876378x758860842273341400")
