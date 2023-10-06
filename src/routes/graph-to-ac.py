@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import base64
 import urllib.parse
+import numpy as np
 
 data = json.loads(sys.argv[1])
 # data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696607311786x746368974526902900/%231.csv', 'logger-graph-id': '1696607318343x927521251863035900', 'dev': 'no'}
@@ -32,7 +33,7 @@ df.info()
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(
-    x=df.iloc[:, 1],
+    x=np.array(df.iloc[:, 1]),
     y=df.iloc[:, 2],
     mode='markers',  # 'markers' means it's a scatterplot
     marker=dict(size=5)
@@ -78,30 +79,3 @@ headers = {
 response = requests.patch(url, json=payload, headers=headers)
 print(response.text)
 print(response.status_code)
-
-
-# def update_graph_in_bubble(html_string, compressor_id):
-#     url = f"https://inflow-co.bubbleapps.io/version-test/api/1.1/obj/Air-Compressor/{compressor_id}"
-#     body = {
-#         "logger-html": html_string
-#     }
-
-#     headers = {
-#         "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-#         "Content-Type": "application/json"
-#     }
-
-#     response = requests.patch(url, json=body, headers=headers)
-#     print(response.text)
-
-
-# update_graph_in_bubble(html_string, compressor_id)
-# This was using mtplotlib and converting to plotly html object to send interactive figures through the post request. The conversion from matplotlib to plotly didn't work.
-# plt.scatter(df.iloc[:, 1], df.iloc[:, 2])
-# plt.xlabel('Timestamp')
-# plt.ylabel('Amps')
-# plt.title('Amps Over Time')
-# plt.xticks(rotation=45)
-# mpl_fig = plt.gcf()
-# plotly_fig = tls.mpl_to_plotly(mpl_fig)
-# pyo.plot(plotly_fig, filename="scatterplot.html")
