@@ -71,7 +71,7 @@ def update_peak_demends(my_dict_compile_master):
 
 def update_pressures(report_id):
     print("Updating Average Pressure per Operating Period")
-    report_json = common_functions.get_req("Report", report_id)
+    report_json = common_functions.get_req("Report", report_id), dev
     if "pressure-sensor" in report_json["response"]:
         op_per_avg_pressures = common_functions.get_avg_pressures(report_json)
 
