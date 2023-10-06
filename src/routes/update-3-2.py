@@ -14,7 +14,11 @@ import common_functions
 
 
 data = json.loads(sys.argv[1]) # Proper Code. Keep this
-
+dev = data.get('dev')
+if dev == 'yes':
+    dev = '/version-test'
+else:
+    dev = ''
 # next 2 lines are for running the code without the webhook. REPORT ID: 1696116368926x296884495425208300
 # local_data = '{"report-id": "1696116368926x296884495425208300"}'
 
@@ -40,7 +44,7 @@ def update_op_periods(my_dict_compile_master, operating_period_ids):
             "Hours/yr": op_per_hours_between,
             "KPI": op_per_kpi
         }
-        common_functions.patch_req("Operation-Period", operating_period_id, body)
+        common_functions.patch_req("Operation-Period", operating_period_id, body, dev)
 
 def update_peak_demends(my_dict_compile_master):
     kpi_3_2 = my_dict_compile_master["kpi_3_2"]
@@ -63,7 +67,7 @@ def update_peak_demends(my_dict_compile_master):
         "kpi-3-2": kpi_3_2
     }
 
-    common_functions.patch_req("Report", report_id, body)
+    common_functions.patch_req("Report", report_id, body, dev)
 
 def update_pressures(report_id):
     print("Updating Average Pressure per Operating Period")
@@ -79,7 +83,7 @@ def update_pressures(report_id):
             body = {
             "P2": p2
             }
-            common_functions.patch_req("Operation-Period", operating_period_id, body)
+            common_functions.patch_req("Operation-Period", operating_period_id, body, dev)
     else:
         print("Nevermind, there are no pressure sensors to calculate")
 
@@ -144,7 +148,7 @@ def acfm_graph_3_min(master_df, report_id):
         }
     }
 
-    url = f"https://inflow-co.bubbleapps.io/version-test/api/1.1/obj/Report/{report_id}"
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/Report/{report_id}"
 
     headers = {
         "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",

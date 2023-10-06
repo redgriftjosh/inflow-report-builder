@@ -8,6 +8,11 @@ import requests
 # next 2 lines are for running the code without the webhook. REPORT ID: 1696116368926x296884495425208300
 local_data = '{"report-id": "1696116368926x296884495425208300"}'
 data = json.loads(local_data)
+dev = data.get('dev')
+if dev == 'yes':
+    dev = '/version-test'
+else:
+    dev = ''
 
 report_id = data.get('report-id')
 
@@ -32,4 +37,4 @@ body = {
     "supply-capacity": supply_capacity
 }
 
-common_functions.patch_req("Report", report_id, body)
+common_functions.patch_req("Report", report_id, body, dev)

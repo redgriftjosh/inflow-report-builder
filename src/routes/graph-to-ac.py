@@ -3,7 +3,6 @@ import json
 import requests #to download csv from a link
 from io import StringIO #We are using the StringIO class from the io module to read the CSV data from a string
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.tools as tls
 import plotly.offline as pyo
 import plotly.graph_objects as go
@@ -11,11 +10,16 @@ import plotly.io as pio
 import base64
 import urllib.parse
 
-data = json.loads(sys.argv[1])
-
-print(data)
+# data = json.loads(sys.argv[1])
+data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696602450548x620097974325447200/%231.csv', 'logger-graph-id': '1696602904810x250681693894869000', 'dev': 'no'}
+print(f"Incoming Webhook: {data}")
 csv_url = data.get('file')
 logger_graph_id = data.get('logger-graph-id')
+dev = data.get('dev')
+if dev == 'yes':
+    dev = '/version-test'
+else:
+    dev = ''
 
 response = requests.get(csv_url)
 response.raise_for_status()
@@ -65,7 +69,7 @@ payload = {
     "logger-html": html_string
 }
 
-url = f"https://inflow-co.bubbleapps.io/version-test/api/1.1/obj/logger-graph/{logger_graph_id}"
+url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/logger-graph/{logger_graph_id}"
 
 headers = {
     "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",

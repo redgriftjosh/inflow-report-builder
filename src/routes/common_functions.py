@@ -11,8 +11,8 @@ import plotly.io as pio
 import base64
 import urllib.parse
 
-def get_req(type, id):
-    url = f"https://inflow-co.bubbleapps.io/version-test/api/1.1/obj/{type}/{id}"
+def get_req(type, id, dev):
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
 
     headers = {
         "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
@@ -22,8 +22,8 @@ def get_req(type, id):
     response.raise_for_status()
     return response.json()
 
-def patch_req(type, id, body):
-    url = f"https://inflow-co.bubbleapps.io/version-test/api/1.1/obj/{type}/{id}"
+def patch_req(type, id, body, dev):
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
     
     headers = {
         "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
