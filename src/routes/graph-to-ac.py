@@ -10,8 +10,8 @@ import plotly.io as pio
 import base64
 import urllib.parse
 
-data = json.loads(sys.argv[1])
-# data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696602450548x620097974325447200/%231.csv', 'logger-graph-id': '1696602904810x250681693894869000', 'dev': 'no'}
+# data = json.loads(sys.argv[1])
+data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696607311786x746368974526902900/%231.csv', 'logger-graph-id': '1696607318343x927521251863035900', 'dev': 'no'}
 print(f"Incoming Webhook: {data}")
 csv_url = data.get('file')
 logger_graph_id = data.get('logger-graph-id')
@@ -77,6 +77,7 @@ headers = {
 }
 response = requests.patch(url, json=payload, headers=headers)
 print(response.text)
+print(response.status_code)
 
 
 # def update_graph_in_bubble(html_string, compressor_id):
