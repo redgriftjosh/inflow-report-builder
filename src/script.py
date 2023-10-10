@@ -26,12 +26,12 @@ def graph_to_ac():
     return response
 
 @app.route('/reset-dataset-7-2', methods=['POST'])
-def graph_to_ac():
+def reset_dataset_7_2():
     response = run_script(data = request.get_json(), script='reset_dataset_7_2.py')
     return response
 
 @app.route('/update-7-2', methods=['POST'])
-def graph_to_ac():
+def update_7_2():
     response = run_script(data = request.get_json(), script='update_7_2.py')
     return response
 
