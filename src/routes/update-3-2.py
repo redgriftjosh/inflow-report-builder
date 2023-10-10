@@ -15,7 +15,7 @@ import common_functions
 # local_data = '{"report-id": "1696617823970x638045281454653400", "dev": "yes"}'
 data = json.loads(sys.argv[1]) # Proper Code. Keep this
 
-data = json.loads(data)
+# data = json.loads(data)
 dev = data.get('dev')
 if dev == 'yes':
     dev = '/version-test'
