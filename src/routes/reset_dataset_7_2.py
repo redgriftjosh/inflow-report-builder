@@ -4,19 +4,6 @@ import requests
 import common_functions
 
 def start(report_id, report_json, dev):
-    # data = json.loads(sys.argv[1]) # Proper Code. Keep this
-    # local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
-
-    # data = json.loads(local_data)
-    # dev = data.get('dev')
-    # if dev == 'yes':
-    #     dev = '/version-test'
-    # else:
-    #     dev = ''
-
-    # report_id = data.get('report-id')
-    # report_json = common_functions.get_req("Report", report_id, dev)
-    print(report_json)
     if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
         operation_period_ids = report_json["response"]["Operation Period"]
     else:
