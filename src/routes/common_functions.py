@@ -22,6 +22,28 @@ def get_req(type, id, dev):
     response.raise_for_status()
     return response.json()
 
+def del_req(type, id, dev):
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
+
+    headers = {
+        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
+        "Content-Type": "application/json"
+    }
+    response = requests.delete(url, headers=headers)
+    response.raise_for_status()
+    return response.status_code
+
+def post_req(type, body, dev):
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}"
+
+    headers = {
+        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
+        "Content-Type": "application/json"
+    }
+    response = requests.post(url, json=body, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
 def patch_req(type, id, body, dev):
     url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
     
@@ -31,7 +53,7 @@ def patch_req(type, id, body, dev):
     }
     try:
         response = requests.patch(url, json=body, headers=headers)
-        print(f"patch_req() {response.status_code, response.text}")
+        print(f"patched: {body}, {response.status_code}")
     except requests.RequestException as e:
         print(e)
 
@@ -41,13 +63,35 @@ def calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf):
 def calculate_olol_acfm(amps, thresholds, cfm):
     return 0 if amps < thresholds else cfm
 
-def calculate_slope_intercept(ac_json, cfm, volts, dev):
-    rated_psig = ac_json["response"]["rated-psig"]
-    setpoint_psig = ac_json["response"]["setpoint-psig"]
+def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "rated-psig" in ac_json["response"]:
+        rated_psig = ac_json["response"]["rated-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "setpoint-psig" in ac_json["response"]:
+        setpoint_psig = ac_json["response"]["setpoint-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
     
     # Get arrays of the slope entries
-    slope_entry_ids = ac_json["response"]["vfd-slope-entries"]
+    if "vfd-slope-entries" in ac_json["response"] and ac_json["response"]["vfd-slope-entries"] != []:
+        slope_entry_ids = ac_json["response"]["vfd-slope-entries"]
+        if len(slope_entry_ids) < 2:
+            patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
     power_input_kws = []
     capacity_acfms = []
     kw_to_amps = []
@@ -56,13 +100,17 @@ def calculate_slope_intercept(ac_json, cfm, volts, dev):
     for idx, slope_entry_id in enumerate(slope_entry_ids):
         slope_json = get_req("vfd-slope-entries", slope_entry_id, dev)
         
-        power_input_kw = slope_json["response"]["power-input-kw"]
-        power_input_kws.append(power_input_kw)
+        if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
+            power_input_kw = slope_json["response"]["power-input-kw"]
+            power_input_kws.append(power_input_kw)
 
-        capacity_acfm = slope_json["response"]["capacity-acfm"]
-        capacity_acfms.append(capacity_acfm)
+            capacity_acfm = slope_json["response"]["capacity-acfm"]
+            capacity_acfms.append(capacity_acfm)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
     
-        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * 1 * volts)
+        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * 0.97 * volts)
         kw_to_amps.append(kw_to_amp)
 
         corrected_amp = kw_to_amp * correction_factor
@@ -225,8 +273,8 @@ def get_pressure_csvs(pressure_ids, dev):
     return pressure_csvs
 
 # converts a csv url into a dataframe
-def csv_to_df(pressure_csv):
-    response = requests.get(pressure_csv) # Step 2: Download the CSV file
+def csv_to_df(csv_url):
+    response = requests.get(csv_url) # Step 2: Download the CSV file
     response.raise_for_status() # Check that the request was successful
     
     csv_data = StringIO(response.text) # Convert CSV into text of some sort
@@ -237,14 +285,67 @@ def csv_to_df(pressure_csv):
 
 # trim the df to be all synced up with other pressure csvs
 def trim_df(report_json, df):
-    trim_start = datetime.strptime(report_json["response"]["trim-start"], '%b %d, %Y %I:%M %p')
-    trim_end = datetime.strptime(report_json["response"]["trim-end"], '%b %d, %Y %I:%M %p')
+    trim_start = datetime.strptime(report_json["response"]["trim-start"], '%Y-%m-%dT%H:%M:%S.%fZ')
+    trim_end = datetime.strptime(report_json["response"]["trim-end"], '%Y-%m-%dT%H:%M:%S.%fZ')
     df = df[(df.iloc[:, 1] >= trim_start) & (df.iloc[:, 1] <= trim_end)]
 
     return df
 
+# Takes in a DataFrame and ouputs a dataframe with excluded time ranges from user input
+def exclude_from_df(df, report_json, dev):
+    exclusion_ids = report_json["response"]["exclusion"]
+    
+    # Initialize a mask with all False (i.e., don't exclude any row initially)
+    exclusion_mask = pd.Series([False] * len(df))
+
+    # Add each exclusion to the mask
+    for exclusion_id in exclusion_ids:
+        exclusion_json = get_req("Exclusion", exclusion_id, dev)
+        print(f"EXCLUSION JSON: {exclusion_json}")
+        start = datetime.strptime(exclusion_json["response"]["start"], '%Y-%m-%dT%H:%M:%S.%fZ')
+        end = datetime.strptime(exclusion_json["response"]["end"], '%Y-%m-%dT%H:%M:%S.%fZ')
+        print(f"START: {start}, END: {end}")
+    
+    # Use the inverse of the mask to filter the dataframe
+    return df[~exclusion_mask]
+
+# Returns a Dictionary = {"pressure_id": {"15-min-peak": 123, "10-min-peak": 321, etc..}, etc..}
+def get_pressure_peaks(report_json, dev):
+    pressure_ids = report_json["response"]["pressure-sensor"]
+
+    pressure_csvs = get_pressure_csvs(pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
+
+    pressure_peaks = {}
+    for id, pressure_csv in pressure_csvs.items():
+
+        df = csv_to_df(pressure_csv) # convert csv_url to dataframe
+
+        if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+            df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+
+        if "exclusion" in report_json["response"]:
+            df = exclude_from_df(df, report_json, dev)
+
+        pressure_peak_15 = df.iloc[:, 2][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+        pressure_peak_10 = df.iloc[:, 2][::-1].rolling(window=50, min_periods=50).mean()[::-1].fillna(0).max()
+        pressure_peak_5 = df.iloc[:, 2][::-1].rolling(window=25, min_periods=25).mean()[::-1].fillna(0).max()
+        pressure_peak_3 = df.iloc[:, 2][::-1].rolling(window=15, min_periods=15).mean()[::-1].fillna(0).max()
+        pressure_peak_2 = df.iloc[:, 2][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+        pressure_low_15 = df.iloc[:, 2][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).min()
+
+        pressure_peaks[id] = {
+            "15-min-peak": pressure_peak_15,
+            "10-min-peak": pressure_peak_10,
+            "5-min-peak": pressure_peak_5,
+            "3-min-peak": pressure_peak_3,
+            "2-min-peak": pressure_peak_2,
+            "15-min-low": pressure_low_15
+            }
+    
+    return pressure_peaks
+
 # returns dictionary = {operating_period_id: {pressure_id: avg_pressure}, etc..}
-# currently don't have a front end setup to be able to varify pressure_ids tho...
+# currently don't have a front end setup to be able to varify pressure_ids for operating periods...
 def get_avg_pressures(report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
@@ -265,6 +366,9 @@ def get_avg_pressures(report_json, dev):
 
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
                     df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+
+                if "exclusion" in report_json["response"]:
+                    df = exclude_from_df(df, report_json, dev)
 
                 df = daily_operating_period(df, operating_period_id, dev) # filter df by operating period
                 avg_pressure = df.iloc[:, 2].mean()
@@ -293,15 +397,13 @@ def get_avg_pressures(report_json, dev):
     return op_per_avg_pressures
 
 
+
+
 def compile_master_df(report_id, dev):
-    report_json = get_req("Report", report_id, dev)
+    report_json = get_req("report", report_id, dev)
     ac_ids = report_json["response"]["Air Compressor"]
 
     my_dict = {}
-
-    # dataframes = []
-
-    # first_dates = []
 
     master_df = None
     cfms = []
@@ -314,11 +416,13 @@ def compile_master_df(report_id, dev):
         csv_url = ac_data_logger_json["response"]["CSV"]
         csv_url = f"https:{csv_url}"
 
-        response = requests.get(csv_url) # Step 2: Download the CSV file
-        response.raise_for_status() # Check that the request was successful
+
+        df = csv_to_df(csv_url)
+        # response = requests.get(csv_url) # Step 2: Download the CSV file
+        # response.raise_for_status() # Check that the request was successful
             
-        csv_data = StringIO(response.text) # Convert CSV into text of some sort
-        df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
+        # csv_data = StringIO(response.text) # Convert CSV into text of some sort
+        # df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
 
         volts = ac_json["response"]["volts"]
         pf50 = ac_json["response"]["pf if fifty"]
@@ -336,7 +440,7 @@ def compile_master_df(report_id, dev):
             threshold = ac_json["response"]["threshold-value"]
             df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
         elif control == "VFD":
-            slope, intercept = calculate_slope_intercept(ac_json, cfm, volts, dev)
+            slope, intercept = calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
             df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, slope, intercept))
         
         current_name_date = df.columns[1]
@@ -354,10 +458,17 @@ def compile_master_df(report_id, dev):
             print("Merged next Dataframe with master_df")
     
     if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-        trim_start = datetime.strptime(report_json["response"]["trim-start"], '%b %d, %Y %I:%M %p')
-        trim_end = datetime.strptime(report_json["response"]["trim-end"], '%b %d, %Y %I:%M %p')
-        master_df = master_df[(master_df.iloc[:, 1] >= trim_start) & (master_df.iloc[:, 1] <= trim_end)]
-        print("Trimmed up the")
+        master_df = trim_df(report_json, master_df)
+        # trim_start = datetime.strptime(report_json["response"]["trim-start"], '%b %d, %Y %I:%M %p')
+        # trim_end = datetime.strptime(report_json["response"]["trim-end"], '%b %d, %Y %I:%M %p')
+        # master_df = master_df[(master_df.iloc[:, 1] >= trim_start) & (master_df.iloc[:, 1] <= trim_end)]
+        # print("Trimmed up the")
+
+    my_dict["master_df"] = master_df
+    print("Added: master_df")
+
+    if "exclusion" in report_json["response"]:
+        master_df = exclude_from_df(master_df, report_json, dev)
 
     op_per_type = report_json["response"]["operating_period_type"]
     
@@ -468,7 +579,7 @@ def compile_master_df(report_id, dev):
     my_dict["kw_max_avg_15"] = kw_max_avg_15
     print("Added: kw_max_avg_15")
 
-    my_dict["master_df"] = master_df
+    my_dict["master_df_excluded"] = master_df
     print("Added: master_df")
 
 

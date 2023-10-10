@@ -12,8 +12,10 @@ import base64
 import urllib.parse
 import common_functions
 
+local_data = '{"report-id": "1696617823970x638045281454653400", "dev": "yes"}'
+# data = json.loads(sys.argv[1]) # Proper Code. Keep this
 
-data = json.loads(sys.argv[1]) # Proper Code. Keep this
+data = json.loads(local_data)
 dev = data.get('dev')
 if dev == 'yes':
     dev = '/version-test'
@@ -158,10 +160,19 @@ def acfm_graph_3_min(master_df, report_id):
     # print(response.text)
     print(f"acfm_graph_3_min() {response.status_code, response.text}")
 
+def pressure_peaks(report_id, dev):
+    report_json = common_functions.get_req("Report", report_id, dev)
+    pressure_peaks = common_functions.get_pressure_peaks(report_json, dev)
+
+    for id, pressure_peak in pressure_peaks.items():
+        common_functions.patch_req("Pressure-Sensor", id, pressure_peak, dev)
+
 update_op_periods(my_dict_compile_master, operating_period_ids)
 
 update_peak_demends(my_dict_compile_master)
 
 update_pressures(report_id)
+
+pressure_peaks(report_id, dev)
 
 acfm_graph_3_min(master_df, report_id)

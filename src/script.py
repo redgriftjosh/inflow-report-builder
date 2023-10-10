@@ -25,6 +25,16 @@ def graph_to_ac():
     response = run_script(data = request.get_json(), script='graph-to-ac.py')
     return response
 
+@app.route('/reset-dataset-7-2', methods=['POST'])
+def graph_to_ac():
+    response = run_script(data = request.get_json(), script='reset_dataset_7_2.py')
+    return response
+
+@app.route('/update-7-2', methods=['POST'])
+def graph_to_ac():
+    response = run_script(data = request.get_json(), script='update_7_2.py')
+    return response
+
 @app.route('/update-3-2', methods=['POST'])
 def update_3_2():
     response = run_script(data = request.get_json(), script='update-3-2.py')
