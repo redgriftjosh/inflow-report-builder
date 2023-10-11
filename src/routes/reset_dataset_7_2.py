@@ -20,7 +20,7 @@ def start(report_id, report_json, dev):
     delete_datasets_7_2(report_id, operation_period_ids, dev)
 
     common_functions.patch_req("Report", report_id, body={"loading": "Recreating empty charts...", "is_loading_error": "no"}, dev=dev)
-    add_datasets_to_operating_periods(operation_period_ids, air_compressor_ids, dev)
+    add_datasets_to_operating_periods(report_id, operation_period_ids, air_compressor_ids, dev)
 
 
 def delete_datasets_7_2(report_id, operation_period_ids, dev):
@@ -59,7 +59,7 @@ def add_datasets_to_operating_periods(report_id, operation_period_ids, air_compr
             else:
                 common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type on Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
                 sys.exit()
-                
+
             if "Model" in air_compressor_json["response"]:    
                 model = air_compressor_json["response"]["Model"]
             else:
