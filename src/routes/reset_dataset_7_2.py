@@ -40,7 +40,7 @@ def delete_datasets_7_2(report_id, operation_period_ids, dev):
             print(f"nothing to delete in {op_name}")
 
 
-def add_datasets_to_operating_periods(operation_period_ids, air_compressor_ids, dev):
+def add_datasets_to_operating_periods(report_id, operation_period_ids, air_compressor_ids, dev):
     for operation_period_id in operation_period_ids: # Loop through each Operating Period
 
         dataset_ids = []
@@ -48,8 +48,24 @@ def add_datasets_to_operating_periods(operation_period_ids, air_compressor_ids, 
             
             # Get the Model from this Air Compressor
             air_compressor_json = common_functions.get_req("Air-Compressor", air_compressor_id, dev)
-            model = air_compressor_json["response"]["Model"]
-            control = air_compressor_json["response"]["Control Type"]
+            if "Customer CA" in air_compressor_json["response"]:
+                ac_name = air_compressor_json["response"]["Customer CA"]
+            else:
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {air_compressor_id}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
+            
+            if "Control Type" in air_compressor_json["response"]:    
+                control = air_compressor_json["response"]["Control Type"]
+            else:
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type on Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
+                
+            if "Model" in air_compressor_json["response"]:    
+                model = air_compressor_json["response"]["Model"]
+            else:
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Model Number on Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
+            
             dataset_body = {"Model": model, "operating-period": operation_period_id, "control-type": control, "air-compressor": air_compressor_id}
 
             # Create new dataset_7_2 thing and assign this air compressors model to it's model
