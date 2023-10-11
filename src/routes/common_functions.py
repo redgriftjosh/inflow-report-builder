@@ -90,7 +90,7 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
             patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     power_input_kws = []
     capacity_acfms = []
@@ -261,15 +261,19 @@ def hours_between_weekly(operating_period_id, dev):
     return total_hours_year
 
 # Returns an dictionary of pressure_id: csv_url designed for the pressure csvs in bubble
-def get_pressure_csvs(pressure_ids, dev):
+def get_pressure_csvs(report_id, pressure_ids, dev):
     pressure_csvs = {}
     for pressure_id in pressure_ids:
         pressure_json = get_req("pressure-sensor", pressure_id, dev)
+        pressure_name = pressure_json["response"]["Name"]
+        patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands for: {pressure_name}...", "is_loading_error": "no"}, dev=dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
             pressure_csvs[pressure_id] = pressure_csv
-    
+        else:
+            patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
     return pressure_csvs
 
 # converts a csv url into a dataframe
@@ -310,10 +314,10 @@ def exclude_from_df(df, report_json, dev):
     return df[~exclusion_mask]
 
 # Returns a Dictionary = {"pressure_id": {"15-min-peak": 123, "10-min-peak": 321, etc..}, etc..}
-def get_pressure_peaks(report_json, dev):
+def get_pressure_peaks(report_id, report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
-    pressure_csvs = get_pressure_csvs(pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
+    pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
     pressure_peaks = {}
     for id, pressure_csv in pressure_csvs.items():
@@ -346,10 +350,10 @@ def get_pressure_peaks(report_json, dev):
 
 # returns dictionary = {operating_period_id: {pressure_id: avg_pressure}, etc..}
 # currently don't have a front end setup to be able to varify pressure_ids for operating periods...
-def get_avg_pressures(report_json, dev):
+def get_avg_pressures(report_id, report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
-    pressure_csvs = get_pressure_csvs(pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
+    pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
     operating_period_ids = report_json["response"]["Operation Period"] # array of operating_period_ids
     op_per_type = report_json["response"]["operating_period_type"] # can be "Daily" or "Weekly"
@@ -365,9 +369,11 @@ def get_avg_pressures(report_json, dev):
                 df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
                     df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
 
                 if "exclusion" in report_json["response"]:
+                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
                     df = exclude_from_df(df, report_json, dev)
 
                 df = daily_operating_period(df, operating_period_id, dev) # filter df by operating period
@@ -386,7 +392,12 @@ def get_avg_pressures(report_json, dev):
                 df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
                     df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+                
+                if "exclusion" in report_json["response"]:
+                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
+                    df = exclude_from_df(df, report_json, dev)
 
                 df = weekly_operating_period(df, operating_period_id, dev) # filter df by operating period
                 avg_pressure = df.iloc[:, 2].mean()
@@ -401,43 +412,101 @@ def get_avg_pressures(report_json, dev):
 
 def compile_master_df(report_id, dev):
     report_json = get_req("report", report_id, dev)
-    ac_ids = report_json["response"]["Air Compressor"]
-
+    if "Air Compressor" in report_json["response"] and report_json["response"]["Air Compressor"] != []:
+        ac_ids = report_json["response"]["Air Compressor"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
     my_dict = {}
 
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
         ac_json = get_req("Air-Compressor", ac, dev)
-        ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
+        if "Customer CA" in ac_json["response"]:
+            ac_name = ac_json["response"]["Customer CA"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
 
-        ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        if "AC-Data-Logger" in ac_json["response"] and ac_json["response"]["AC-Data-Logger"] != []:
+            ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
+            ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
 
-        csv_url = ac_data_logger_json["response"]["CSV"]
-        csv_url = f"https:{csv_url}"
+        if "CSV" in ac_data_logger_json["response"]:
+            csv_url = ac_data_logger_json["response"]["CSV"]
+            csv_url = f"https:{csv_url}"
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
 
-
+        patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
         df = csv_to_df(csv_url)
         # response = requests.get(csv_url) # Step 2: Download the CSV file
         # response.raise_for_status() # Check that the request was successful
             
         # csv_data = StringIO(response.text) # Convert CSV into text of some sort
         # df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
-
-        volts = ac_json["response"]["volts"]
-        pf50 = ac_json["response"]["pf if fifty"]
-        pf = ac_json["response"]["pf"]
-        amppf = ac_json["response"]["amps less pf"]
-        bhp = ac_json["response"]["BHP"]
+        patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
+        if "volts" in ac_json["response"]:
+            volts = ac_json["response"]["volts"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "pf if fifty" in ac_json["response"]:
+            pf50 = ac_json["response"]["pf if fifty"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "pf" in ac_json["response"]:
+            pf = ac_json["response"]["pf"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "amps less pf" in ac_json["response"]:
+            amppf = ac_json["response"]["amps less pf"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "BHP" in ac_json["response"]:
+            bhp = ac_json["response"]["BHP"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
         
         df[f"Kilowatts{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
 
-        control = ac_json["response"]["Control Type"]
-        cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-        cfms.append(cfm)
+        patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
+        # Create ACFM Column
+
+        if "Control Type" in ac_json["response"]:
+            control = ac_json["response"]["Control Type"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "CFM" in ac_json["response"]:
+            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+            cfms.append(cfm)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
 
         if control == "OLOL":
-            threshold = ac_json["response"]["threshold-value"]
+            if "threshold-value" in ac_json["response"]:
+                threshold = ac_json["response"]["threshold-value"]
+            else:
+                patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
             df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
         elif control == "VFD":
             slope, intercept = calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
@@ -455,9 +524,11 @@ def compile_master_df(report_id, dev):
             print("added first DataFrame to master_df")
         else:
             master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
+            patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
     if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+        patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = trim_df(report_json, master_df)
         # trim_start = datetime.strptime(report_json["response"]["trim-start"], '%b %d, %Y %I:%M %p')
         # trim_end = datetime.strptime(report_json["response"]["trim-end"], '%b %d, %Y %I:%M %p')
@@ -468,11 +539,18 @@ def compile_master_df(report_id, dev):
     print("Added: master_df")
 
     if "exclusion" in report_json["response"]:
+        patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = exclude_from_df(master_df, report_json, dev)
 
-    op_per_type = report_json["response"]["operating_period_type"]
+    if "Operation Period" in report_json["response"]:
+        op_per_type = report_json["response"]["operating_period_type"]
+        
+        operating_period_ids = report_json["response"]["Operation Period"]
+        patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+    else:
+        patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
     
-    operating_period_ids = report_json["response"]["Operation Period"]
 
     if op_per_type == "Daily":
         
@@ -501,7 +579,7 @@ def compile_master_df(report_id, dev):
         op_per_hours_betweens = []
         op_per_kpis = []
         for operating_period_id in operating_period_ids:
-            period_data = weekly_operating_period(master_df, operating_period_id) # see def for explanation
+            period_data = weekly_operating_period(master_df, operating_period_id, dev) # see def for explanation
 
             avg_acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
             avg_acfms.append(avg_acfm)
