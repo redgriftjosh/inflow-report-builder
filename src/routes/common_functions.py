@@ -542,7 +542,7 @@ def compile_master_df(report_id, dev):
         patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = exclude_from_df(master_df, report_json, dev)
 
-    if "Operation Period" in report_json["response"]:
+    if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
         
         operating_period_ids = report_json["response"]["Operation Period"]
