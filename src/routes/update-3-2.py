@@ -175,10 +175,11 @@ def acfm_graph_3_min(master_df, report_id):
 def pressure_peaks(report_id, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands...", "is_loading_error": "no"}, dev=dev)
     report_json = common_functions.get_req("Report", report_id, dev)
-    pressure_peaks = common_functions.get_pressure_peaks(report_id, report_json, dev)
+    if "pressure-sensor" in report_json["response"] and report_json["response"]["pressure-sensor"] != []:
+        pressure_peaks = common_functions.get_pressure_peaks(report_id, report_json, dev)
 
-    for id, pressure_peak in pressure_peaks.items():
-        common_functions.patch_req("Pressure-Sensor", id, pressure_peak, dev)
+        for id, pressure_peak in pressure_peaks.items():
+            common_functions.patch_req("Pressure-Sensor", id, pressure_peak, dev)
 
 update_op_periods(my_dict_compile_master, operating_period_ids)
 

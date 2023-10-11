@@ -317,10 +317,15 @@ def exclude_from_df(df, report_json, dev):
 def get_pressure_peaks(report_id, report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
-    pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
-
     pressure_peaks = {}
-    for id, pressure_csv in pressure_csvs.items():
+    for id in pressure_ids:
+        pressure_json = get_req("pressure-sensor", id, dev)
+        if "csv-psig" in pressure_json["response"]:
+            pressure_csv = pressure_json["response"]["csv-psig"]
+            pressure_csv = f"https:{pressure_csv}"
+        else:
+            patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
 
         df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
