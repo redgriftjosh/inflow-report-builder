@@ -5,10 +5,10 @@ import common_functions
 import pandas as pd
 
 def start():
-    # data = json.loads(sys.argv[1]) # Proper Code. Keep this
-    local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
+    data = json.loads(sys.argv[1]) # Proper Code. Keep this
+    # local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
 
-    data = json.loads(local_data)
+    # data = json.loads(local_data)
     print(data)
     dev = data.get('dev')
     if dev == 'yes':
