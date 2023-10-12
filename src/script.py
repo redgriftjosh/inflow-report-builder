@@ -30,6 +30,11 @@ def reset_dataset_7_2():
     response = run_script(data = request.get_json(), script='reset_dataset_7_2.py')
     return response
 
+@app.route('/data_crunch_download', methods=['POST'])
+def data_crunch_download():
+    response = run_script(data = request.get_json(), script='data_crunch_download.py')
+    return response
+
 @app.route('/update-7-2', methods=['POST'])
 def update_7_2():
     response = run_script(data = request.get_json(), script='update_7_2.py')
