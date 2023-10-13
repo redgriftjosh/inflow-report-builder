@@ -288,30 +288,63 @@ def csv_to_df(csv_url):
     return df
 
 # trim the df to be all synced up with other pressure csvs
-def trim_df(report_json, df):
-    trim_start = datetime.strptime(report_json["response"]["trim-start"], '%Y-%m-%dT%H:%M:%S.%fZ')
-    trim_end = datetime.strptime(report_json["response"]["trim-end"], '%Y-%m-%dT%H:%M:%S.%fZ')
-    df = df[(df.iloc[:, 1] >= trim_start) & (df.iloc[:, 1] <= trim_end)]
+def trim_df(report_json, df, dev):
+    try:
+        trim_id = report_json["response"]["trim"]
+        report_id = report_json["response"]["_id"]
+        trim_json = get_req("trim", trim_id, dev)
 
-    return df
+        start_date = datetime.strptime(trim_json["response"]["start_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        start_time = datetime.strptime(trim_json["response"]["start_time"], "%I:%M %p")
+        start = start_date.replace(hour=start_time.hour, minute=start_time.minute)
+
+        end_date = datetime.strptime(trim_json["response"]["end_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        end_time = datetime.strptime(trim_json["response"]["end_time"], "%I:%M %p")
+        end = end_date.replace(hour=end_time.hour, minute=end_time.minute)
+
+        df = df[(df.iloc[:, 1] >= start) & (df.iloc[:, 1] <= end)]
+
+        return df
+    except:
+        patch_req("Report", report_id, body={"loading": f"We're having some trouble Trimming your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
 
 # Takes in a DataFrame and ouputs a dataframe with excluded time ranges from user input
 def exclude_from_df(df, report_json, dev):
-    exclusion_ids = report_json["response"]["exclusion"]
-    
-    # Initialize a mask with all False (i.e., don't exclude any row initially)
-    exclusion_mask = pd.Series([False] * len(df))
+    try:
+        exclusion_ids = report_json["response"]["exclusion"]
+        report_id = report_json["response"]["_id"]
 
-    # Add each exclusion to the mask
-    for exclusion_id in exclusion_ids:
-        exclusion_json = get_req("Exclusion", exclusion_id, dev)
-        print(f"EXCLUSION JSON: {exclusion_json}")
-        start = datetime.strptime(exclusion_json["response"]["start"], '%Y-%m-%dT%H:%M:%S.%fZ')
-        end = datetime.strptime(exclusion_json["response"]["end"], '%Y-%m-%dT%H:%M:%S.%fZ')
-        print(f"START: {start}, END: {end}")
+        # Initialize a mask with all False (i.e., don't exclude any row initially)
+        exclusion_mask = pd.Series([False] * len(df), index=df.index)
+
+        # Add each exclusion to the mask
+        for exclusion_id in exclusion_ids:
+            exclusion_json = get_req("Exclusion", exclusion_id, dev)
+            start_date = datetime.strptime(exclusion_json["response"]["start_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+            start_time = datetime.strptime(exclusion_json["response"]["start_time"], "%I:%M %p")
+            start = start_date.replace(hour=start_time.hour, minute=start_time.minute)
+
+            end_date = datetime.strptime(exclusion_json["response"]["end_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+            end_time = datetime.strptime(exclusion_json["response"]["end_time"], "%I:%M %p")
+            end = end_date.replace(hour=end_time.hour, minute=end_time.minute)
+
+            exclusion_mask |= (df.iloc[:, 1] >= start) & (df.iloc[:, 1] <= end)
+        
+        # Use the inverse of the mask to filter the dataframe
+        return df[~exclusion_mask]
+    except:
+        patch_req("Report", report_id, body={"loading": f"We're having some trouble removing Exclusions from your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+def sanitize_filename(filename):
+    # Define the allowed characters
+    allowed_chars = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     
-    # Use the inverse of the mask to filter the dataframe
-    return df[~exclusion_mask]
+    # Replace characters that are not in the allowed set with "_"
+    sanitized = ''.join(char if char in allowed_chars else '_' for char in filename)
+    
+    return sanitized
 
 # Returns a Dictionary = {"pressure_id": {"15-min-peak": 123, "10-min-peak": 321, etc..}, etc..}
 def get_pressure_peaks(report_id, report_json, dev):
@@ -330,7 +363,7 @@ def get_pressure_peaks(report_id, report_json, dev):
         df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
         if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-            df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+            df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
 
         if "exclusion" in report_json["response"]:
             df = exclude_from_df(df, report_json, dev)
@@ -375,7 +408,7 @@ def get_avg_pressures(report_id, report_json, dev):
 
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
                     patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
-                    df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+                    df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
 
                 if "exclusion" in report_json["response"]:
                     patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
@@ -398,7 +431,7 @@ def get_avg_pressures(report_id, report_json, dev):
 
                 if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
                     patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
-                    df = trim_df(report_json, df) # trim the df to be all synced up with other pressure csvs
+                    df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
                 
                 if "exclusion" in report_json["response"]:
                     patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
@@ -534,11 +567,7 @@ def compile_master_df(report_id, dev):
     
     if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
         patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
-        master_df = trim_df(report_json, master_df)
-        # trim_start = datetime.strptime(report_json["response"]["trim-start"], '%b %d, %Y %I:%M %p')
-        # trim_end = datetime.strptime(report_json["response"]["trim-end"], '%b %d, %Y %I:%M %p')
-        # master_df = master_df[(master_df.iloc[:, 1] >= trim_start) & (master_df.iloc[:, 1] <= trim_end)]
-        # print("Trimmed up the")
+        master_df = trim_df(report_json, master_df, dev)
 
     my_dict["master_df"] = master_df
     print("Added: master_df")

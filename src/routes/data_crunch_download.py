@@ -6,7 +6,7 @@ import pandas as pd
 
 def start():
     data = json.loads(sys.argv[1]) # Proper Code. Keep this
-    # local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
+    local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
 
     # data = json.loads(local_data)
     print(data)
@@ -130,12 +130,12 @@ def compile_master_df(report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
-    if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+    if "trim" in report_json["response"]:
         common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
-        master_df = common_functions.trim_df(report_json, master_df)
+        master_df = common_functions.trim_df(report_json, master_df, dev)
 
     if "exclusion" in report_json["response"]:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
+        common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Removing Exclusions from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = common_functions.exclude_from_df(master_df, report_json, dev)
 
     if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
@@ -156,9 +156,9 @@ def compile_master_df(report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
             period_data = common_functions.daily_operating_period(master_df, operating_period_id, dev)
 
-            period_data.to_csv(f"Data_Crunch_{operating_period_name}_{operating_period_id}.csv")
+            period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{operating_period_name}_{operating_period_id}.csv"}, dev=dev)
+            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
     elif op_per_type == "Weekly":
 
         for operating_period_id in operating_period_ids:
@@ -167,9 +167,9 @@ def compile_master_df(report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
             period_data = common_functions.weekly_operating_period(master_df, operating_period_id, dev) # see def for explanation
 
-            period_data.to_csv(f"Data_Crunch{operating_period_name}_{operating_period_id}.csv")
+            period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{operating_period_name}_{operating_period_id}.csv"}, dev=dev)
+            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
     
     common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Success!", "is_loading_error": "no"}, dev=dev)
             
