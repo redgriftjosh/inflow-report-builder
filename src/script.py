@@ -59,5 +59,5 @@ def update_3_3():
 
 # ONLY FOR TESTING LOCALLY COMMENT OUT WHEN YOU COMMIT
 # ./ngrok http --domain=up-marmot-tops.ngrok-free.app 3000
-if __name__ == '__main__':
-    app.run(debug=True, port=3000)
+# if __name__ == '__main__':
+#     app.run(debug=True, port=3000)
