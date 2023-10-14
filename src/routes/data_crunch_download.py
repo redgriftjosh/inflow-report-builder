@@ -158,7 +158,7 @@ def compile_master_df(report_id, dev):
 
             period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
+            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
     elif op_per_type == "Weekly":
 
         for operating_period_id in operating_period_ids:
@@ -169,7 +169,7 @@ def compile_master_df(report_id, dev):
 
             period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/routes/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
+            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
     
     common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Success!", "is_loading_error": "no"}, dev=dev)
             
