@@ -40,7 +40,7 @@ def check_datasets(report_id, report_json, dev):
         df = common_functions.csv_to_df(csv_url)
 
         # Trim & Exclude specified data
-        if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+        if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
             df = common_functions.trim_df(report_json, df)
 
         if "exclusion" in report_json["response"]:
@@ -186,8 +186,8 @@ def get_average_kw(report_id, report_json, dev):
         df = common_functions.csv_to_df(csv_url)
 
         # Trim & Exclude specified data
-        if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-            df = common_functions.trim_df(report_json, df)
+        if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+            df = common_functions.trim_df(report_json, df, dev)
             common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Trimming CSV...", "is_loading_error": "no"}, dev=dev)
 
         if "exclusion" in report_json["response"]:

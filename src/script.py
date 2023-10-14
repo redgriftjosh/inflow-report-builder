@@ -56,6 +56,8 @@ def update_3_3():
     response = run_script(data = request.get_json(), script='update-3-3.py')
     return response
 
+
 # ONLY FOR TESTING LOCALLY COMMENT OUT WHEN YOU COMMIT
-# if __name__ == '__main__':
-#     app.run(debug=True, port=3000)
+# ./ngrok http --domain=up-marmot-tops.ngrok-free.app 3000
+if __name__ == '__main__':
+    app.run(debug=True, port=3000)

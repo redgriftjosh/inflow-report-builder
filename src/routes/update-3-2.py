@@ -26,6 +26,7 @@ else:
 
 report_id = data.get('report-id')
 
+
 print("Getting all data from common_functions.py")
 my_dict_compile_master = common_functions.compile_master_df(report_id, dev)
 
@@ -87,7 +88,7 @@ def update_pressures(report_id):
         for operating_period_id, pressure in op_per_avg_pressures.items():
             operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
             operating_period = operating_period_json["response"]["Name"]
-            common_functions.patch_req("Report", report_id, body={"loading": f"Updating Average Pressure for Operating Period: {operating_period}...", "is_loading_error": "no"}, dev=dev)
+            common_functions.patch_req("Report", report_id, body={"loading": f"Updating Operating Period: {operating_period}...", "is_loading_error": "no"}, dev=dev)
             print(f"For Operating Period ID: {operating_period_id} Average Pressures: {pressure}")
             p2 = list(pressure.values())
             body = {

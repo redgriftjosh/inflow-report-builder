@@ -265,8 +265,6 @@ def get_pressure_csvs(report_id, pressure_ids, dev):
     pressure_csvs = {}
     for pressure_id in pressure_ids:
         pressure_json = get_req("pressure-sensor", pressure_id, dev)
-        pressure_name = pressure_json["response"]["Name"]
-        patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands for: {pressure_name}...", "is_loading_error": "no"}, dev=dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
@@ -362,7 +360,7 @@ def get_pressure_peaks(report_id, report_json, dev):
 
         df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
-        if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+        if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
             df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
 
         if "exclusion" in report_json["response"]:
@@ -391,11 +389,13 @@ def get_pressure_peaks(report_id, report_json, dev):
 def get_avg_pressures(report_id, report_json, dev):
     pressure_ids = report_json["response"]["pressure-sensor"]
 
+    patch_req("Report", report_id, body={"loading": f"Reading Pressure CSVs...", "is_loading_error": "no"}, dev=dev)
     pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
     operating_period_ids = report_json["response"]["Operation Period"] # array of operating_period_ids
     op_per_type = report_json["response"]["operating_period_type"] # can be "Daily" or "Weekly"
 
+    patch_req("Report", report_id, body={"loading": f"Calculating Average Pressure for each Pressure Log in each Operating Period...", "is_loading_error": "no"}, dev=dev)
     op_per_avg_pressures = {} # will hold {operating_period_id: {pressure_id: avg_pressure}, etc..}
     if op_per_type == "Daily":
 
@@ -406,12 +406,10 @@ def get_avg_pressures(report_id, report_json, dev):
 
                 df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
-                if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
+                if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
                     df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
 
                 if "exclusion" in report_json["response"]:
-                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
                     df = exclude_from_df(df, report_json, dev)
 
                 df = daily_operating_period(df, operating_period_id, dev) # filter df by operating period
@@ -429,12 +427,10 @@ def get_avg_pressures(report_id, report_json, dev):
 
                 df = csv_to_df(pressure_csv) # convert csv_url to dataframe
 
-                if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
-                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Trimming CSV...", "is_loading_error": "no"}, dev=dev)
+                if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
                     df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
                 
                 if "exclusion" in report_json["response"]:
-                    patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands Removing Exclusions from CSV...", "is_loading_error": "no"}, dev=dev)
                     df = exclude_from_df(df, report_json, dev)
 
                 df = weekly_operating_period(df, operating_period_id, dev) # filter df by operating period
@@ -565,7 +561,7 @@ def compile_master_df(report_id, dev):
             patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
-    if "trim-start" in report_json["response"] and "trim-end" in report_json["response"]:
+    if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = trim_df(report_json, master_df, dev)
 

@@ -130,7 +130,7 @@ def compile_master_df(report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
-    if "trim" in report_json["response"]:
+    if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = common_functions.trim_df(report_json, master_df, dev)
 
@@ -162,7 +162,7 @@ def compile_master_df(report_id, dev):
     elif op_per_type == "Weekly":
 
         for operating_period_id in operating_period_ids:
-            operating_period_json = common_functions.get_req("Operation Period", operating_period_id, dev)
+            operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
             operating_period_name = operating_period_json["response"]["Name"]
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
             period_data = common_functions.weekly_operating_period(master_df, operating_period_id, dev) # see def for explanation
