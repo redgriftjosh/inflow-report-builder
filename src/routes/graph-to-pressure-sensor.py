@@ -64,7 +64,7 @@ payload = {
     "pressure-html": html_string
 }
 
-url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/Pressure-Sensor/{pressure_id}"
+url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/pressure_sensor/{pressure_id}"
 
 headers = {
     "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
@@ -76,7 +76,7 @@ print(response.text)
 html_string = pio.to_html(fig, full_html=False)
 
 def update_pressure_graph_in_bubble(html_string, pressure_id):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/Pressure-Sensor/{pressure_id}"
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/pressure_sensor/{pressure_id}"
     body = {
         "pressure-html": html_string
     }

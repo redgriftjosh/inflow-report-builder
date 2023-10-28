@@ -10,6 +10,56 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import base64
 import urllib.parse
+import re
+
+
+def clean_json(my_json, processed_ids=None, additional_keys=None):
+    
+    try:
+        my_json = my_json['response']
+    except:
+        print("Could not remove: my_json['response']")
+    
+    keys_to_remove = ["_id", "Modified Date", "Created Date", "Created By", "created_by_user_id"]
+
+    if additional_keys is not None:
+        keys_to_remove.extend(additional_keys)
+
+    for key in keys_to_remove:
+        print(f"Removed: {key}")
+        my_json.pop(key, None)
+    
+
+    if processed_ids:
+        new_json = {}
+
+        for key, value in my_json.items():
+            if value not in processed_ids:
+                new_json[key] = value
+            else:
+                print(f"Removed: {key}: {value}")
+                
+        print('')
+        return new_json
+    else:
+        return my_json
+
+
+def find_ids(my_json):
+    object_id_pattern = re.compile(r'^\d+x\d+$') # pattern states any number of numbers separated by an x e.g.(1x1) or (12423x0934)
+    id_dict = {}
+    for key, value in my_json.items(): # For each item in the clean json (should be clean)
+        if isinstance(value, list): # if the value of this item is an array (LiSt)
+            for id in value: # for each id in the list
+                if object_id_pattern.match(str(id)) and len(str(id)) == 32: # if it matches pattern and is 32 characters add to dict
+                    id_dict[key] = value
+                break
+        else:
+            if object_id_pattern.match(str(value)) and len(str(value)) == 32: # if it's not a list then just check if the value matches and add to dictionary
+                id_dict[key] = value
+
+    
+    return id_dict
 
 def get_req(type, id, dev):
     url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
@@ -84,8 +134,8 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
     
     # Get arrays of the slope entries
-    if "vfd-slope-entries" in ac_json["response"] and ac_json["response"]["vfd-slope-entries"] != []:
-        slope_entry_ids = ac_json["response"]["vfd-slope-entries"]
+    if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
+        slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 2:
             patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
@@ -98,7 +148,7 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
     corrected_amps = []
     corrected_acfms = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd-slope-entries", slope_entry_id, dev)
+        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
@@ -136,7 +186,7 @@ def calculate_vfd_acfm(amps, slope, intercept):
 
 # gets start & end time for each day of the week returned in a dictionary.
 def weekly_dictionary(operating_period_id, dev):
-    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
+    operating_period_json = get_req("operation_period", operating_period_id, dev)
 
     days = ["sun", "mon", "tues", "wed", "thurs", "fri", "sat"] # for easily getting the data from bubble -- works with the naming convention
     large_days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] # for 
@@ -157,7 +207,7 @@ def weekly_dictionary(operating_period_id, dev):
 # return the number of hours within the operating periods per year.
 # function is special for the daily operating periods.
 def hours_between(operating_period_id, dev):
-    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
+    operating_period_json = get_req("operation_period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     today = datetime.today()
@@ -212,7 +262,7 @@ def weekly_operating_period(df, operating_period_id, dev):
 # takes a dataframe and an operating period ID and returns a filtered dataframe.
 # Designed for daily operating period not weekly.
 def daily_operating_period(df, operating_period_id, dev):
-    operating_period_json = get_req("Operation-Period", operating_period_id, dev)
+    operating_period_json = get_req("operation_period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     operating_period = operating_period_json["response"]["Name"]
@@ -264,7 +314,7 @@ def hours_between_weekly(operating_period_id, dev):
 def get_pressure_csvs(report_id, pressure_ids, dev):
     pressure_csvs = {}
     for pressure_id in pressure_ids:
-        pressure_json = get_req("pressure-sensor", pressure_id, dev)
+        pressure_json = get_req("pressure_sensor", pressure_id, dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
@@ -318,7 +368,7 @@ def exclude_from_df(df, report_json, dev):
 
         # Add each exclusion to the mask
         for exclusion_id in exclusion_ids:
-            exclusion_json = get_req("Exclusion", exclusion_id, dev)
+            exclusion_json = get_req("exclusion", exclusion_id, dev)
             start_date = datetime.strptime(exclusion_json["response"]["start_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
             start_time = datetime.strptime(exclusion_json["response"]["start_time"], "%I:%M %p")
             start = start_date.replace(hour=start_time.hour, minute=start_time.minute)
@@ -346,11 +396,11 @@ def sanitize_filename(filename):
 
 # Returns a Dictionary = {"pressure_id": {"15-min-peak": 123, "10-min-peak": 321, etc..}, etc..}
 def get_pressure_peaks(report_id, report_json, dev):
-    pressure_ids = report_json["response"]["pressure-sensor"]
+    pressure_ids = report_json["response"]["pressure_sensor"]
 
     pressure_peaks = {}
     for id in pressure_ids:
-        pressure_json = get_req("pressure-sensor", id, dev)
+        pressure_json = get_req("pressure_sensor", id, dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
@@ -387,12 +437,12 @@ def get_pressure_peaks(report_id, report_json, dev):
 # returns dictionary = {operating_period_id: {pressure_id: avg_pressure}, etc..}
 # currently don't have a front end setup to be able to varify pressure_ids for operating periods...
 def get_avg_pressures(report_id, report_json, dev):
-    pressure_ids = report_json["response"]["pressure-sensor"]
+    pressure_ids = report_json["response"]["pressure_sensor"]
 
     patch_req("Report", report_id, body={"loading": f"Reading Pressure CSVs...", "is_loading_error": "no"}, dev=dev)
     pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
-    operating_period_ids = report_json["response"]["Operation Period"] # array of operating_period_ids
+    operating_period_ids = report_json["response"]["operation_period"] # array of operating_period_ids
     op_per_type = report_json["response"]["operating_period_type"] # can be "Daily" or "Weekly"
 
     patch_req("Report", report_id, body={"loading": f"Calculating Average Pressure for each Pressure Log in each Operating Period...", "is_loading_error": "no"}, dev=dev)
@@ -446,8 +496,8 @@ def get_avg_pressures(report_id, report_json, dev):
 
 def compile_master_df(report_id, dev):
     report_json = get_req("report", report_id, dev)
-    if "Air Compressor" in report_json["response"] and report_json["response"]["Air Compressor"] != []:
-        ac_ids = report_json["response"]["Air Compressor"]
+    if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
+        ac_ids = report_json["response"]["air_compressor"]
     else:
         patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
@@ -456,7 +506,7 @@ def compile_master_df(report_id, dev):
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = get_req("Air-Compressor", ac, dev)
+        ac_json = get_req("air_compressor", ac, dev)
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
         else:
@@ -465,9 +515,9 @@ def compile_master_df(report_id, dev):
         
         patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
 
-        if "AC-Data-Logger" in ac_json["response"] and ac_json["response"]["AC-Data-Logger"] != []:
-            ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
-            ac_data_logger_json = get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
+            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
+            ac_data_logger_json = get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
             patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
@@ -572,10 +622,10 @@ def compile_master_df(report_id, dev):
         patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = exclude_from_df(master_df, report_json, dev)
 
-    if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
+    if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
         
-        operating_period_ids = report_json["response"]["Operation Period"]
+        operating_period_ids = report_json["response"]["operation_period"]
         patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)

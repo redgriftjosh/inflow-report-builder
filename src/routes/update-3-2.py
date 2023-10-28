@@ -41,7 +41,7 @@ def update_op_periods(my_dict_compile_master, operating_period_ids):
     op_per_kpis = my_dict_compile_master["op_per_kpis"]
 
     for operating_period_id, op_per_avg_kw, op_per_avg_acfm, op_per_hours_between, op_per_kpi in zip(operating_period_ids, op_per_avg_kws, op_per_avg_acfms, op_per_hours_betweens, op_per_kpis):
-        operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
+        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
         operating_period = operating_period_json["response"]["Name"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Populating {operating_period}...", "is_loading_error": "no"}, dev=dev)
         body = {
@@ -50,10 +50,10 @@ def update_op_periods(my_dict_compile_master, operating_period_ids):
             "Hours/yr": op_per_hours_between,
             "KPI": op_per_kpi
         }
-        common_functions.patch_req("Operation-Period", operating_period_id, body, dev)
+        common_functions.patch_req("operation_period", operating_period_id, body, dev)
 
 def update_peak_demends(my_dict_compile_master):
-    common_functions.patch_req("Report", report_id, body={"loading": f"Populating Peak Flow Demands...", "is_loading_error": "no"}, dev=dev)
+    common_functions.patch_req("report", report_id, body={"loading": f"Populating Peak Flow Demands...", "is_loading_error": "no"}, dev=dev)
     kpi_3_2 = my_dict_compile_master["kpi_3_2"]
     max_avg_15 = my_dict_compile_master["max_avg_15"]
     max_avg_10 = my_dict_compile_master["max_avg_10"]
@@ -80,13 +80,13 @@ def update_pressures(report_id):
     print("Updating Average Pressure per Operating Period")
     common_functions.patch_req("Report", report_id, body={"loading": f"Updating Average Pressure per Operating Period...", "is_loading_error": "no"}, dev=dev)
     report_json = common_functions.get_req("Report", report_id, dev)
-    if "pressure-sensor" in report_json["response"]:
+    if "pressure_sensor" in report_json["response"]:
         op_per_avg_pressures = common_functions.get_avg_pressures(report_id, report_json, dev)
 
         print(f"Full Dictionary: {op_per_avg_pressures}")
         
         for operating_period_id, pressure in op_per_avg_pressures.items():
-            operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
+            operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
             operating_period = operating_period_json["response"]["Name"]
             common_functions.patch_req("Report", report_id, body={"loading": f"Updating Operating Period: {operating_period}...", "is_loading_error": "no"}, dev=dev)
             print(f"For Operating Period ID: {operating_period_id} Average Pressures: {pressure}")
@@ -94,7 +94,7 @@ def update_pressures(report_id):
             body = {
             "P2": p2
             }
-            common_functions.patch_req("Operation-Period", operating_period_id, body, dev)
+            common_functions.patch_req("operation_period", operating_period_id, body, dev)
     else:
         print("Nevermind, there are no pressure sensors to calculate")
         common_functions.patch_req("Report", report_id, body={"loading": f"Nevermind, there are no pressure sensors to calculate.", "is_loading_error": "no"}, dev=dev)
@@ -176,11 +176,11 @@ def acfm_graph_3_min(master_df, report_id):
 def pressure_peaks(report_id, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands...", "is_loading_error": "no"}, dev=dev)
     report_json = common_functions.get_req("Report", report_id, dev)
-    if "pressure-sensor" in report_json["response"] and report_json["response"]["pressure-sensor"] != []:
+    if "pressure_sensor" in report_json["response"] and report_json["response"]["pressure_sensor"] != []:
         pressure_peaks = common_functions.get_pressure_peaks(report_id, report_json, dev)
 
         for id, pressure_peak in pressure_peaks.items():
-            common_functions.patch_req("Pressure-Sensor", id, pressure_peak, dev)
+            common_functions.patch_req("pressure_sensor", id, pressure_peak, dev)
 
 update_op_periods(my_dict_compile_master, operating_period_ids)
 

@@ -6,17 +6,17 @@ import reset_dataset_7_2
 import pandas as pd
 
 def check_datasets(report_id, report_json, dev):
-    if "Air Compressor" in report_json["response"]:
-        ac_ids = report_json["response"]["Air Compressor"]
+    if "air_compressor" in report_json["response"]:
+        ac_ids = report_json["response"]["air_compressor"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(ac_ids)} Air Compressor{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         common_functions.patch_req("Report", report_id, body={"loading": "No Air Compressors Found! You need at least one Air Compressor.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
-    if "Operation Period" in report_json["response"]:
+    if "operation_period" in report_json["response"]:
         op_per_type = report_json["response"]["operating_period_type"]
         
-        operating_period_ids = report_json["response"]["Operation Period"]
+        operating_period_ids = report_json["response"]["operation_period"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
@@ -25,14 +25,14 @@ def check_datasets(report_id, report_json, dev):
 
     for ac in ac_ids:
         # Get the Air Compressor into a DataFrame
-        ac_json = common_functions.get_req("Air-Compressor", ac, dev)
-        if "AC-Data-Logger" in ac_json["response"]:
-            ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
+        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        if "ac_data_logger" in ac_json["response"]:
+            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing data loggers! Make sure each Air Compressor has a Properly Formatted CSV uploaded. Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
-        ac_data_logger_json = common_functions.get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
 
         csv_url = ac_data_logger_json["response"]["CSV"]
         csv_url = f"https:{csv_url}"
@@ -99,7 +99,7 @@ def start():
     get_average_kw(report_id, report_json, dev)
 
 def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev):
-    operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
+    operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
     if "Name" in operating_period_json["response"]:    
         op_name =  operating_period_json["response"]["Name"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Populating {op_name}...", "is_loading_error": "no"}, dev=dev)
@@ -133,27 +133,28 @@ def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, a
         "peak-2-acfm": peak_2_acfm,
         "peak-2-flow-percent": peak_2_flow_percent
         }
+    
 
     # Send the patch to the dataset linked to the right air compressor 
-    operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
-    dataset_ids = operating_period_json["response"]["dataset-7-2"]
+    operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+    dataset_ids = operating_period_json["response"]["dataset_7_2"]
     for dataset_id in dataset_ids:
-        dataset_json = common_functions.get_req("dataset-7-2", dataset_id, dev)
-        if dataset_json["response"]["air-compressor"] == ac:
-            common_functions.patch_req("dataset-7-2", dataset_id, body, dev)
+        dataset_json = common_functions.get_req("dataset_7_2", dataset_id, dev)
+        if dataset_json["response"]["air_compressor"] == ac:
+            common_functions.patch_req("dataset_7_2", dataset_id, body, dev)
 
 def get_average_kw(report_id, report_json, dev):
-    if "Air Compressor" in report_json["response"] and report_json["response"]["Air Compressor"] != []:
-        ac_ids = report_json["response"]["Air Compressor"]
+    if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
+        ac_ids = report_json["response"]["air_compressor"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(ac_ids)} Air Compressor{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         common_functions.patch_req("Report", report_id, body={"loading": "No Air Compressors Found! You need at least one Air Compressor.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
-    if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
+    if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
         
-        operating_period_ids = report_json["response"]["Operation Period"]
+        operating_period_ids = report_json["response"]["operation_period"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
@@ -164,14 +165,14 @@ def get_average_kw(report_id, report_json, dev):
         
         
         # Get the Air Compressor into a DataFrame
-        ac_json = common_functions.get_req("Air-Compressor", ac, dev)
-        if "AC-Data-Logger" in ac_json["response"]:
-            ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
+        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        if "ac_data_logger" in ac_json["response"]:
+            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing data loggers! Make sure each Air Compressor has a Properly Formatted CSV uploaded. Air Compressor: {ac}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
-        ac_data_logger_json = common_functions.get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
         
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
@@ -272,6 +273,7 @@ def get_average_kw(report_id, report_json, dev):
 
                 dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev)
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+                
 start()
     
     

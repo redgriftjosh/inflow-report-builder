@@ -3,6 +3,7 @@ import json
 import requests
 import common_functions
 import pandas as pd
+import base64
 
 def start():
     data = json.loads(sys.argv[1]) # Proper Code. Keep this
@@ -21,8 +22,8 @@ def start():
 
 def compile_master_df(report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
-    if "Air Compressor" in report_json["response"] and report_json["response"]["Air Compressor"] != []:
-        ac_ids = report_json["response"]["Air Compressor"]
+    if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
+        ac_ids = report_json["response"]["air_compressor"]
     else:
         common_functions.patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
@@ -30,7 +31,7 @@ def compile_master_df(report_id, dev):
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = common_functions.get_req("Air-Compressor", ac, dev)
+        ac_json = common_functions.get_req("air_compressor", ac, dev)
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
         else:
@@ -39,9 +40,9 @@ def compile_master_df(report_id, dev):
         
         common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Reading {ac_name}.csv...", "is_loading_error": "no"}, dev=dev)
 
-        if "AC-Data-Logger" in ac_json["response"] and ac_json["response"]["AC-Data-Logger"] != []:
-            ac_data_logger_id = ac_json["response"]["AC-Data-Logger"]
-            ac_data_logger_json = common_functions.get_req("AC-Data-Logger", ac_data_logger_id, dev)
+        if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
+            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
+            ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
@@ -138,10 +139,10 @@ def compile_master_df(report_id, dev):
         common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Removing Exclusions from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = common_functions.exclude_from_df(master_df, report_json, dev)
 
-    if "Operation Period" in report_json["response"] and report_json["response"]["Operation Period"] != []:
+    if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
         
-        operating_period_ids = report_json["response"]["Operation Period"]
+        operating_period_ids = report_json["response"]["operation_period"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
@@ -151,25 +152,80 @@ def compile_master_df(report_id, dev):
     if op_per_type == "Daily":
 
         for operating_period_id in operating_period_ids:
-            operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
-            operating_period_name = operating_period_json["response"]["Name"]
+            operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+            try:
+                operating_period_name = operating_period_json["response"]["Name"]
+            except:
+                operating_period_name = ''
+                
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
             period_data = common_functions.daily_operating_period(master_df, operating_period_id, dev)
 
-            period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
+            file_name = f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
+            csv_data = period_data.to_csv(index=False)
+            base64_encoded_data = base64.b64encode(csv_data.encode()).decode()
+
+            body = {
+                "file": {
+                    "filename": file_name,
+                    "contents": base64_encoded_data,
+                    "private": False
+                    }
+                }
+
+            url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/operation_period/{operating_period_id}"
+
+            headers = {
+                "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1"
+            }
+
+            try:
+                response = requests.patch(url, json=body, headers=headers)
+                print(f"patched: {file_name}, {response.status_code}")
+                print(response.text)
+            except requests.RequestException as e:
+                print(e)
+
+            # common_functions.patch_req("operation_period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
     elif op_per_type == "Weekly":
 
         for operating_period_id in operating_period_ids:
-            operating_period_json = common_functions.get_req("Operation-Period", operating_period_id, dev)
-            operating_period_name = operating_period_json["response"]["Name"]
+            operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+            try:
+                operating_period_name = operating_period_json["response"]["Name"]
+            except:
+                operating_period_name = ''
+            
             common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
+            file_name = f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"
+                
             period_data = common_functions.weekly_operating_period(master_df, operating_period_id, dev) # see def for explanation
+            
 
-            period_data.to_csv(f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv")
+            csv_data = period_data.to_csv(index=False)
+            base64_encoded_data = base64.b64encode(csv_data.encode()).decode()
 
-            common_functions.patch_req("Operation-Period", operating_period_id, body={"data-crunch": f"https://www.pythonanywhere.com/user/jredgrift/files/home/jredgrift/inflow-report-builder/src/Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"}, dev=dev)
+            body = {
+                "file": {
+                    "filename": file_name,
+                    "contents": base64_encoded_data,
+                    "private": False
+                    }
+                }
+
+            url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/operation_period/{operating_period_id}"
+
+            headers = {
+                "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1"
+            }
+
+            try:
+                response = requests.patch(url, json=body, headers=headers)
+                print(f"patched: {file_name}, {response.status_code}")
+                print(response.text)
+            except requests.RequestException as e:
+                print(e)
     
     common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Success!", "is_loading_error": "no"}, dev=dev)
             
