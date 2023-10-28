@@ -73,8 +73,8 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 # Get the json for that object id
                 try:
                     my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
-                    print(f"get_new_things_{iteration}: {my_thing}")
-                    print('')
+                    # print(f"get_new_things_{iteration}: {json.dumps(my_thing)[:1000]}")
+                    # print('')
                 except:
                     try:
                         common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Error: Could not find item: {key}. Please tell Josh to check the database for spelling mistakes.", "is_loading_error": "yes"}, dev=dev)
@@ -83,12 +83,12 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
                 
                 my_thing = clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
-                print(f"get_new_things_{iteration} - clean_json: {my_thing}")
-                print('')
+                # print(f"get_new_things_{iteration} - clean_json: {my_thing}")
+                # print('')
 
                 things_json = find_ids(my_thing) # check to see if there are any ids attached to this thing
-                print(f"get_new_things_{iteration} - find_ids: {things_json}")
-                print('')
+                # print(f"get_new_things_{iteration} - find_ids: {things_json}")
+                # print('')
                 
                 # if there are things attached to this thing
                 if things_json:
@@ -102,9 +102,9 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 
 
                 response = common_functions.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
-                print(f"get_new_things_{iteration} - post_req: {response}")
-                print('')
-                print('')
+                # print(f"get_new_things_{iteration} - post_req: {response}")
+                # print('')
+                # print('')
 
                 new_id = response['id'] # Get the new id
                 if things_json:
@@ -123,16 +123,16 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
             # Get the json for that object id
             my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
-            print(f"get_new_things_{iteration}: {my_thing}")
-            print('')
+            # print(f"get_new_things_{iteration}: {json.dumps(my_thing)[:1000]}")
+            # print('')
             
             my_thing = clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
-            print(f"get_new_things_{iteration} - clean_json: {my_thing}")
-            print('')
+            # print(f"get_new_things_{iteration} - clean_json: {my_thing}")
+            # print('')
 
             things_json = find_ids(my_thing) # check to see if there are any ids attached to this thing
-            print(f"get_new_things_{iteration} - find_ids: {things_json}")
-            print('')
+            # print(f"get_new_things_{iteration} - find_ids: {things_json}")
+            # print('')
             
             # if there are things attached to this thing
             if things_json:
@@ -145,7 +145,7 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 print('') 
 
             response = common_functions.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
-            print(f"get_new_things_{iteration} - post_req: {response}")
+            # print(f"get_new_things_{iteration} - post_req: {response}")
             print('')
             print('')
 
@@ -185,11 +185,11 @@ def start():
     report_json = common_functions.get_req("report", report_id, dev)
     created_by_user_id = report_json["response"]["created_by_user_id"]
 
-    print(f"1 - Dirty Report Json: {report_json}")
+    # print(f"1 - Dirty Report Json: {report_json}")
     print('')
     try:
         report_json = clean_json(report_json, processed_ids)
-        print(f"1 - Cleaned Report Json: {report_json}")
+        # print(f"1 - Cleaned Report Json: {report_json}")
         print('')
     except:
         common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
@@ -197,7 +197,7 @@ def start():
 
     try:
         things_json = find_ids(report_json) # returns the report_json but only with thing ids e.g. {'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021'], 'trim': '098732490873x298374210398701'}
-        print(f"1 - ONLY IDS: {things_json}")
+        # print(f"1 - ONLY IDS: {things_json}")
         print('')
     except:
         common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
@@ -205,8 +205,8 @@ def start():
 
     if things_json:
         new_things_json = get_new_things(things_json, created_by_user_id, processed_ids, iteration, dev) # returns a json with the new ids formatted the same as above but with each object copied and a new id assigned.
-        print(f"1 - NEW ONLY IDS: {things_json}")
-        print('')
+        # print(f"1 - NEW ONLY IDS: {things_json}")
+        # print('')
 
         for key in new_things_json:
             report_json[key] = new_things_json[key]
@@ -214,8 +214,8 @@ def start():
     report_json['Report Name'] = report_name
     report_json['created_by_user_id'] = created_by_user_id
 
-    print(f"1 - Final Report JSON: {report_json}")
-    print('')
+    # print(f"1 - Final Report JSON: {report_json}")
+    # print('')
     response = common_functions.post_req("report", report_json, dev)
     new_report_id = response['id']
     new_type = 'report'

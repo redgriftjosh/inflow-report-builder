@@ -27,18 +27,18 @@ def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
 
                 # Get the json for that object id
                 my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
-                print(f"get_things - {iteration}: {my_thing}")
-                print('')
+                # print(f"get_things - {iteration}: {my_thing}")
+                # print('')
                 
                 my_thing = common_functions.clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
                 total_output.update({f"{key}_{id}": my_thing})
-                print(f"Getting Things - {iteration} - cleaned_json and added to list: {my_thing}")
-                print(f"total_output so far: {total_output}")
-                print('')
+                # print(f"Getting Things - {iteration} - cleaned_json and added to list: {my_thing}")
+                # print(f"total_output so far: {total_output}")
+                # print('')
 
                 things_json = common_functions.find_ids(my_thing) # check to see if there are any ids attached to this thing
-                print(f"Getting Things - {iteration} - find_ids: {things_json}")
-                print('')
+                # print(f"Getting Things - {iteration} - find_ids: {things_json}")
+                # print('')
                 
                 # if there are things attached to this thing
                 if things_json:
@@ -56,17 +56,17 @@ def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
 
             # Get the json for that object id
             my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
-            print(f"get_things - {iteration}: {my_thing}")
-            print('')
+            # print(f"get_things - {iteration}: {my_thing}")
+            # print('')
             
             my_thing = common_functions.clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
             total_output.update({f"{key}_{value}": my_thing})
-            print(f"Getting Things - {iteration} - cleaned_json and added to list: {my_thing}")
-            print('')
+            # print(f"Getting Things - {iteration} - cleaned_json and added to list: {my_thing}")
+            # print('')
 
             things_json = common_functions.find_ids(my_thing) # check to see if there are any ids attached to this thing
-            print(f"Getting Things - {iteration} - find_ids: {things_json}")
-            print('')
+            # print(f"Getting Things - {iteration} - find_ids: {things_json}")
+            # print('')
             
             # if there are things attached to this thing
             if things_json:
@@ -109,21 +109,21 @@ def start():
 
     report_json = common_functions.get_req("report", report_id, dev)
 
-    print(f"1 - Dirty Report Json: {report_json}")
-    print('')
+    # print(f"1 - Dirty Report Json: {report_json}")
+    # print('')
     try:
         report_json = common_functions.clean_json(report_json, processed_ids)
         total_output.update({"report": report_json})
-        print(f"1 - Cleaned Report Json & Added to Total Output: {report_json}")
-        print('')
+        # print(f"1 - Cleaned Report Json & Added to Total Output: {report_json}")
+        # print('')
     except:
         common_functions.patch_req("report", report_id, body={'loading': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     try:
         things_json = common_functions.find_ids(report_json) # returns the report_json but only with thing ids e.g. {'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021'], 'trim': '098732490873x298374210398701'}
-        print(f"1 - ONLY IDS: {things_json}")
-        print('')
+        # print(f"1 - ONLY IDS: {things_json}")
+        # print('')
     except:
         common_functions.patch_req("report", report_id, body={'loading': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()

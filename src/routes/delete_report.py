@@ -58,16 +58,16 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
                 # Get the json for that object id
                 my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
-                print(f"delete_things - {iteration}: {my_thing}")
-                print('')
+                # print(f"delete_things - {iteration}: {my_thing}")
+                # print('')
                 
                 my_thing = clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
-                print(f"delete_things - {iteration} - clean_json: {my_thing}")
-                print('')
+                # print(f"delete_things - {iteration} - clean_json: {my_thing}")
+                # print('')
 
                 things_json = find_ids(my_thing) # check to see if there are any ids attached to this thing
-                print(f"delete_things - {iteration} - find_ids: {things_json}")
-                print('')
+                # print(f"delete_things - {iteration} - find_ids: {things_json}")
+                # print('')
                 
                 # if there are things attached to this thing
                 if things_json:
@@ -78,9 +78,9 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                     print('')
                 
                 response = common_functions.del_req(key, id, dev)
-                print(f"delete_things - {iteration} - del_req: {response}")
-                print('')
-                print('')
+                # print(f"delete_things - {iteration} - del_req: {response}")
+                # print('')
+                # print('')
         
         # if it's not an array e.g. 'trim': '098732490873x298374210398701'
         else:
@@ -89,16 +89,16 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
             # Get the json for that object id
             my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
-            print(f"delete_things - {iteration}: {my_thing}")
-            print('')
+            # print(f"delete_things - {iteration}: {my_thing}")
+            # print('')
             
             my_thing = clean_json(my_thing, processed_ids) # get rid of the id, created by modified etc... & Processed ids
-            print(f"delete_things - {iteration} - clean_json: {my_thing}")
-            print('')
+            # print(f"delete_things - {iteration} - clean_json: {my_thing}")
+            # print('')
 
             things_json = find_ids(my_thing) # check to see if there are any ids attached to this thing
-            print(f"delete_things - {iteration} - find_ids: {things_json}")
-            print('')
+            # print(f"delete_things - {iteration} - find_ids: {things_json}")
+            # print('')
             
             # if there are things attached to this thing
             if things_json:
@@ -109,9 +109,9 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 print('')
             
             response = common_functions.del_req(key, value, dev)
-            print(f"delete_things - {iteration} - del_req: {response}")
-            print('')
-            print('')
+            # print(f"delete_things - {iteration} - del_req: {response}")
+            # print('')
+            # print('')
 
 def start():
     data = json.loads(sys.argv[1]) # Proper Code. Keep this
@@ -132,20 +132,20 @@ def start():
     report_json = common_functions.get_req("report", report_id, dev)
     created_by_user_id = report_json["response"]["created_by_user_id"]
 
-    print(f"1 - Dirty Report Json: {report_json}")
-    print('')
+    # print(f"1 - Dirty Report Json: {report_json}")
+    # print('')
     try:
         report_json = clean_json(report_json, processed_ids)
-        print(f"1 - Cleaned Report Json: {report_json}")
-        print('')
+        # print(f"1 - Cleaned Report Json: {report_json}")
+        # print('')
     except:
         common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     try:
         things_json = find_ids(report_json) # returns the report_json but only with thing ids e.g. {'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021'], 'trim': '098732490873x298374210398701'}
-        print(f"1 - ONLY IDS: {things_json}")
-        print('')
+        # print(f"1 - ONLY IDS: {things_json}")
+        # print('')
     except:
         common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
@@ -156,10 +156,10 @@ def start():
 
     report_json['created_by_user_id'] = created_by_user_id
 
-    print(f"1 - deleting report: {report_json}")
-    print('')
+    # print(f"1 - deleting report: {report_json}")
+    # print('')
     response = common_functions.del_req("report", report_id, dev)
-    print(f"del_req report: {response}")
+    # print(f"del_req report: {response}")
     
     common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Success!", "is_loading_error": "no"}, dev=dev)
 
