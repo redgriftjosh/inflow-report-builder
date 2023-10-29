@@ -103,7 +103,7 @@ def patch_req(type, id, body, dev):
     }
     try:
         response = requests.patch(url, json=body, headers=headers)
-        print(f"patched: {body}, {response.status_code}")
+        # print(f"patched: {body}, {response.status_code}")
     except requests.RequestException as e:
         print(e)
 
