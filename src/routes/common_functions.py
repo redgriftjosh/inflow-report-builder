@@ -957,7 +957,7 @@ def compile_master_df(report_id, dev):
             kpi = avg_kilowatts/avg_acfm
             op_per_kpis.append(kpi)
 
-            mins_diff = minutes_between_experimental(operating_period_id, dev)
+            mins_diff, _ = minutes_between_experimental(operating_period_id, dev)
             hours_diff = mins_diff / 60
             op_per_hours_betweens.append(hours_diff)
 
