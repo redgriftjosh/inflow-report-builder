@@ -241,12 +241,15 @@ def get_average_kw(report_id, report_json, dev):
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
-        
-        if "CFM" in ac_json["response"]:
-            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-        elif control != "Fixed Speed - Variable Capacity":
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
+
+        if control == "Fixed Speed - Variable Capacity":
+            cfm = 1
+        else:
+            if "CFM" in ac_json["response"]:
+                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+            else:
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
         
 
         print(f"calculating flow for {ac_name}")

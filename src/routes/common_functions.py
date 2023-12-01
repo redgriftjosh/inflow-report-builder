@@ -331,6 +331,7 @@ def calculate_inlet_mod_acfm(amps, slope, intercept, min_amps, max_flow):
         return init_flow
 
 def calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id):
+    print(f"control: {control}")
     if control == "Fixed Speed - OLOL":
         if "threshold-value" in ac_json["response"]:
             threshold = ac_json["response"]["threshold-value"]
@@ -849,14 +850,23 @@ def compile_master_df(report_id, dev):
             patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if "CFM" in ac_json["response"]:
-            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-            cfms.append(cfm)
-        elif control != "Fixed Speed - Variable Capacity":
-            patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit(1)
-        else:
+        if control == "Fixed Speed - Variable Capacity":
             cfm = 1
+        else:
+            if "CFM" in ac_json["response"]:
+                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+            else:
+                patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
+        
+        # if "CFM" in ac_json["response"]:
+        #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+        #     cfms.append(cfm)
+        # elif control != "Fixed Speed - Variable Capacity":
+        #     patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #     sys.exit(1)
+        # else:
+        #     cfm = 1
 
         df = calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
 
