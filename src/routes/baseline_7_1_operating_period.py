@@ -51,7 +51,11 @@ def get_pressure_index(report_id, op_json, dev):
         return None
 
 def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
-    elec_provider_id = report_json["response"]["electrical_provider"]
+    try:
+        elec_provider_id = report_json["response"]["electrical_provider"]
+    except:
+        print(f"Can't find any Electrical Utility info!", file=sys.stderr)
+        sys.exit(1)
     elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
