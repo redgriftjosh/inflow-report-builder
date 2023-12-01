@@ -855,6 +855,7 @@ def compile_master_df(report_id, dev):
         else:
             if "CFM" in ac_json["response"]:
                 cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+                cfms.append(cfm)
             else:
                 patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
                 sys.exit()
