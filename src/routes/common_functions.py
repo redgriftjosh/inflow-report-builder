@@ -536,7 +536,9 @@ def minutes_between_experimental(op_id, dev):
                     for minute in range(int(start_minute), int(end_minute)):
                         weekly_schedule[day_idx * 1440 + minute] = True
     
-    total_minutes = sum(weekly_schedule) # Adds together only true values in list -- e.g. sum([False, True, False, True]) = 2
+    weekly_minutes = sum(weekly_schedule) # Adds together only true values in list -- e.g. sum([False, True, False, True]) = 2
+
+    total_minutes = weekly_minutes * 52
 
     return total_minutes, weekly_schedule
                 
@@ -852,7 +854,9 @@ def compile_master_df(report_id, dev):
             cfms.append(cfm)
         elif control != "Fixed Speed - Variable Capacity":
             patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
+            sys.exit(1)
+        else:
+            cfm = 1
 
         df = calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
 

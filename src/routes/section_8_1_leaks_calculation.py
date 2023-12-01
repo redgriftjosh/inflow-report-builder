@@ -48,7 +48,8 @@ def get_total_annual_operating_hours(report_json, dev):
                 if base_weekly_schedule[i] == False:   
                     base_weekly_schedule[i] = weekly_schedule[i]
         
-        total_hrs = sum(base_weekly_schedule) / 60
+        weekly_hrs = sum(base_weekly_schedule) / 60
+        total_hrs = weekly_hrs * 52
         return total_hrs
 
 
@@ -214,6 +215,10 @@ def start():
 
     # Sending the final calculations back to Bubble.io
     common_functions.patch_req("eco_table_8_1", eco_table_8_1_id, body, dev)
+
+    # Update the total hours in appendix right here for now.
+    response = common_functions.patch_req("report", report_id, body={"total_hours": total_op_hours}, dev=dev)
+    print(f"update totale hours: {response}")
 
 
 start()
