@@ -104,17 +104,19 @@ def compile_master_df(report_id, dev):
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
+        
+        df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
 
-        if control == "OLOL":
-            if "threshold-value" in ac_json["response"]:
-                threshold = ac_json["response"]["threshold-value"]
-            else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
+        # if control == "OLOL":
+        #     if "threshold-value" in ac_json["response"]:
+        #         threshold = ac_json["response"]["threshold-value"]
+        #     else:
+        #         common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         sys.exit()
+        #     df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
+        # elif control == "VFD":
+        #     slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        #     df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
         
         current_name_date = df.columns[1]
         current_name_num = df.columns[0]
@@ -212,6 +214,47 @@ def compile_master_df(report_id, dev):
                     "contents": base64_encoded_data,
                     "private": False
                     }
+                }
+
+            url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/operation_period/{operating_period_id}"
+
+            headers = {
+                "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1"
+            }
+
+            try:
+                response = requests.patch(url, json=body, headers=headers)
+                print(f"patched: {file_name}, {response.status_code}")
+                print(response.text)
+            except requests.RequestException as e:
+                print(e)
+    elif op_per_type == "Experimental":
+        for operating_period_id in operating_period_ids:
+            operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+
+            mins = common_functions.minutes_between_experimental(operating_period_id, dev)
+
+            try:
+                operating_period_name = operating_period_json["response"]["Name"]
+            except:
+                operating_period_name = ''
+            
+            common_functions.patch_req("Report", report_id, body={"loading": f"Building Data Crunch: Data_Crunch_{operating_period_name}.csv...", "is_loading_error": "no"}, dev=dev)
+            file_name = f"Data_Crunch_{common_functions.sanitize_filename(f'{operating_period_name}_{operating_period_id}')}.csv"
+                
+            period_data = common_functions.experimental_operating_period(master_df, operating_period_id, dev)
+            
+
+            csv_data = period_data.to_csv(index=False)
+            base64_encoded_data = base64.b64encode(csv_data.encode()).decode()
+
+            body = {
+                "file": {
+                    "filename": file_name,
+                    "contents": base64_encoded_data,
+                    "private": False
+                    },
+                "Hours/yr": mins
                 }
 
             url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/operation_period/{operating_period_id}"

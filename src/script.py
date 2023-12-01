@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import subprocess
 import os
 import json
@@ -8,12 +8,20 @@ app = Flask(__name__)
 def run_script(data, script):
     serialized_data = json.dumps(data)
     script_path = os.path.join('routes', script)
+
+    # This one normally pushes all console error messages as a response to the post req
+    # result = subprocess.run(['python3', script_path, serialized_data], text=True, stderr=subprocess.PIPE)
+
+    # I wanted to see the errors in the console
     result = subprocess.run(['python3', script_path, serialized_data])
     
     if result.returncode == 0:
+        # If the script was successful, return the success message
         return ("Success!", 200)
     else:
-        return (f"Error: {result.returncode}", 500)
+        # If there was an error, return the error message
+        error_message = result.stderr.strip() if result.stderr else f"Script failed with return code {result.returncode}"
+        return (f"Error: {error_message}", 500)
 
 @app.route('/graph-to-pressure-sensor', methods=['POST'])
 def graph_to_pressure_sensor():
@@ -74,6 +82,15 @@ def update_3_1():
 @app.route('/update_3_3', methods=['POST'])
 def update_3_3():
     response = run_script(data = request.get_json(), script='update_3_3.py')
+    return response
+
+@app.route('/run_backend', methods=['POST'])
+def run_backend():
+    data = request.get_json()
+    script_name = data.get('script')
+    script_body = data.get('script_body')
+
+    response = run_script(script_body, script_name)
     return response
 
 

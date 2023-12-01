@@ -1,0 +1,50 @@
+
+{
+    "report_id": "1697665600466x124847461118842600",
+    "eco_table_8_1_id": "1700246325961x871632769278017500",
+    "dev": "yes"
+}
+
+
+{
+    "operation_period": [{
+        "Name": "Weekends",
+        "mon-start": []
+    }]
+}
+
+// environmental_adj_cfm.py
+{
+    "leak_entry": "1698170359783x121929026163965950",
+    "change_all_leaks": "no",
+    "uf": 100,
+    "cfm": 5,
+    "environmental_adjustment": 100,
+    "dev": "yes"
+}
+
+// adjusted_cfm
+{
+    "leak_entry": "1698170359783x121929026163965950",
+    "uf": 100,
+    "cfm": 5,
+    "dev": "yes"
+}
+
+{
+    'response': {
+        '_id': '1700500225011x131594248130658300', 
+        'Modified Date': '2023-11-20T17:10:56.976Z', 
+        'Created Date': '2023-11-20T17:10:25.276Z', 
+        'Created By': '1693061022457x136392712872048800', 
+        'all_day': False, 
+        'end_time': '5:00 PM', 
+        'operation_period': '1700500208753x139254615249256450', 
+        'repeat_number': 1, 
+        'repeat_on_weekly': ['Monday', 'Tuesday'], 
+        'repeat_period': 'Weeks', 
+        'start_time': '9:00 AM'
+        }
+    }
+{'response': {'_id': '1700500234853x727287719530070000', 'Modified Date': '2023-11-20T17:11:02.750Z', 'Created Date': '2023-11-20T17:10:35.197Z', 'Created By': '1693061022457x136392712872048800', 'all_day': False, 'end_time': '6:00 PM', 'operation_period': '1700500208753x139254615249256450', 'repeat_number': 1, 'repeat_on_weekly': ['Wednesday', 'Thursday'], 'repeat_period': 'Weeks', 'start_time': '10:00 AM'}}
+{'response': {'_id': '1700500263802x628913949924393000', 'Modified Date': '2023-11-20T17:11:07.239Z', 'Created Date': '2023-11-20T17:11:03.986Z', 'Created By': '1693061022457x136392712872048800', 'all_day': True, 'operation_period': '1700500208753x139254615249256450', 'repeat_number': 1, 'repeat_on_weekly': ['Friday'], 'repeat_period': 'Weeks'}}
