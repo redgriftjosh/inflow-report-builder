@@ -116,7 +116,11 @@ def get_body(op_id, report_id, dev):
     report_json = common_functions.get_req("Report", report_id, dev)
     peak_15min_acfm = report_json["response"]["15 Min Peak Flow"]
 
-    average_acfm = op_json["response"]["ACFM Made"]
+    try:
+        average_acfm = op_json["response"]["ACFM Made"]
+    except:
+        print(f"I'm looking for Averaeg ACFM Made from section 3.2 but can't seem to find it... Did you already run section 3.2? You need to if you haven't.", file=sys.stderr)
+        sys.exit(1)
 
     pressure = get_pressure_index(report_id, op_json, dev)
 

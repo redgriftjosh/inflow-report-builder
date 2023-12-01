@@ -279,6 +279,15 @@ def get_average_kw(report_id, report_json, dev):
                 period_data = common_functions.weekly_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
 
                 dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev)
+        
+        elif op_per_type == "Experimental":
+
+            for operating_period_id in operating_period_ids:
+                
+                # get the average kw for this operating period
+                period_data = common_functions.experimental_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
+
+                dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev)
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
                 
 start()

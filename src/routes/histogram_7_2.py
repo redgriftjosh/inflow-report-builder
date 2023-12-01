@@ -214,6 +214,14 @@ def acfm_2min_peak_values(dfs, op_id, report_id, dev):
             acfms.append(max_avg_2)
         return acfms
 
+    elif op_per_type == "Experimental":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+            acfms.append(max_avg_2)
+        return acfms
+
 def acfm_values(dfs, op_id, report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
     op_per_type = report_json["response"]["operating_period_type"]
@@ -231,6 +239,14 @@ def acfm_values(dfs, op_id, report_id, dev):
         acfms = []
         for df in dfs:
             period_data = common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
+            acfms.append(acfm)
+        return acfms
+    
+    elif op_per_type == "Experimental":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
             acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
             acfms.append(acfm)
         return acfms
@@ -301,16 +317,18 @@ def get_df_for_each_ac(ac_ids, report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if control == "OLOL":
-            if "threshold-value" in ac_json["response"]:
-                threshold = ac_json["response"]["threshold-value"]
-            else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
+        df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
+
+        # if control == "OLOL":
+        #     if "threshold-value" in ac_json["response"]:
+        #         threshold = ac_json["response"]["threshold-value"]
+        #     else:
+        #         common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         sys.exit()
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
+        # elif control == "VFD":
+        #     slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
         
         my_dfs.append(df)
     return my_dfs
@@ -411,6 +429,7 @@ def start():
 
     dfs = get_df_for_each_ac(ac_ids, report_id, dev)
     acfms = acfm_values(dfs, op_id, report_id, dev) # returns acfm per ac list = [432, 234, 234]
+    print(f"acfms: {acfms}")
     max_avg_2_acfms = acfm_2min_peak_values(dfs, op_id, report_id, dev)
 
     hist_height = get_heighest_hist(acfms, max_avg_2_acfms)
