@@ -72,6 +72,17 @@ def get_req(type, id, dev):
     response.raise_for_status()
     return response.json()
 
+def get_list_req(type, dev):
+    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}"
+
+    headers = {
+        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
 def del_req(type, id, dev):
     url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
 
@@ -113,13 +124,13 @@ def calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf):
 def calculate_olol_acfm(amps, thresholds, cfm):
     return 0 if amps < thresholds else cfm
 
-def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
+def get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev):
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
         patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
-    
+
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
@@ -132,12 +143,83 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
         patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
+
+    if "pf" in ac_json["response"]:
+        pf = ac_json["response"]["pf"]
+    else:
+        pf = 0.97
     
-    # Get arrays of the slope entries
+
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
-        if len(slope_entry_ids) < 2:
-            patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        if len(slope_entry_ids) < 3:
+            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    else:
+        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    power_input_kws = []
+    capacity_acfms = []
+    kw_to_amps = []
+    corrected_amps = []
+    for idx, slope_entry_id in enumerate(slope_entry_ids):
+        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        
+        if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
+            power_input_kw = slope_json["response"]["power-input-kw"]
+            power_input_kws.append(power_input_kw)
+
+            capacity_acfm = slope_json["response"]["capacity-acfm"]
+            capacity_acfms.append(capacity_acfm)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    
+        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
+        kw_to_amps.append(kw_to_amp)
+
+        corrected_amp = kw_to_amp * correction_factor
+        corrected_amps.append(corrected_amp)
+
+    
+    min_amps = min(corrected_amps)
+    max_flow = max(capacity_acfms)
+
+    coefficients = np.polyfit(corrected_amps, capacity_acfms, 2)
+    a, b, c = coefficients
+
+    return a, b, c, min_amps, max_flow
+
+def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+    if "rated-psig" in ac_json["response"]:
+        rated_psig = ac_json["response"]["rated-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "setpoint-psig" in ac_json["response"]:
+        setpoint_psig = ac_json["response"]["setpoint-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
+
+    if "pf" in ac_json["response"]:
+        pf = ac_json["response"]["pf"]
+    else:
+        pf = 0.97
+    
+
+    if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
+        slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
+        if len(slope_entry_ids) < 3:
+            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
         patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
@@ -160,7 +242,7 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
             patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     
-        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * 0.97 * volts)
+        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
         kw_to_amps.append(kw_to_amp)
 
         corrected_amp = kw_to_amp * correction_factor
@@ -169,20 +251,114 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
         if idx == 0:
             corrected_acfm = cfm
         else:
-            corrected_acfm = capacity_acfms[0] / cfm * capacity_acfm
+            corrected_acfm = cfm / capacity_acfms[0] * capacity_acfm
+        print(f"Corrected ACFM: {corrected_acfm}")
         corrected_acfms.append(corrected_acfm)
+    
+    min_amps = min(corrected_amps)
+    max_flow = max(corrected_acfms)
+
+    coefficients = np.polyfit(corrected_amps, corrected_acfms, 2)
+    a, b, c = coefficients
+
+    return a, b, c, min_amps, max_flow
+
+def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "rated-psig" in ac_json["response"]:
+        rated_psig = ac_json["response"]["rated-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "setpoint-psig" in ac_json["response"]:
+        setpoint_psig = ac_json["response"]["setpoint-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
+    
+    if "kw_at_full_load" in ac_json["response"]:
+        kw_at_full_load = ac_json["response"]["kw_at_full_load"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "pf" in ac_json["response"]:
+        pf = ac_json["response"]["pf"]
+    else:
+        pf = 0.97
+
+    kw_to_amp = (1000 * kw_at_full_load) / (sqrt(3) * pf * volts)
+
+    corrected_amp = kw_to_amp * correction_factor
+
+    corrected_amps = [corrected_amp, (corrected_amp * 0.7)]
+    corrected_acfms = [cfm, 0]
+
+    min_amps = min(corrected_amps)
 
 
     slope, intercept = np.polyfit(corrected_amps, corrected_acfms, 1)
-    # print(f"Corrected Amps: {corrected_amps}")
-    # print(f"Corracted ACFMs: {corrected_acfms}")
-    # print(f"SLOPE: {slope}")
-    # print(f"Intercept: {intercept}")
 
-    return slope, intercept
+    return slope, intercept, min_amps
 
-def calculate_vfd_acfm(amps, slope, intercept):
-    return amps * slope + intercept
+def calculate_vfd_acfm(amps, a, b, c, min_amps, max_flow):
+
+    init_flow = a * amps**2 + b * amps + c
+
+    if amps < min_amps:
+        return 0
+    elif init_flow > max_flow:
+        return max_flow
+    else:
+        return init_flow
+
+def calculate_inlet_mod_acfm(amps, slope, intercept, min_amps, max_flow):
+    
+    init_flow = amps * slope + intercept
+
+    if amps < min_amps:
+        return 0
+    elif init_flow > max_flow:
+        return max_flow
+    else:
+        return init_flow
+
+def calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id):
+    print(f"control: {control}")
+    if control == "Fixed Speed - OLOL":
+        if "threshold-value" in ac_json["response"]:
+            threshold = ac_json["response"]["threshold-value"]
+        else:
+            patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
+        return df
+    elif control == "Variable Speed - VFD":
+        print(f"Control Type: {control}")
+        a, b, c, min_amps, max_flow  = get_polynomial_vars(report_id, ac_json, cfm, volts, dev)
+        print(a, b, c, min_amps, max_flow)
+        df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, a, b, c, min_amps, max_flow))
+        return df
+    elif control == "Fixed Speed - Inlet Modulation":
+        slope, intercept, min_amps = calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_inlet_mod_acfm(amps, slope, intercept, min_amps, cfm))
+        return df
+    elif control == "Fixed Speed - Variable Capacity":
+        a, b, c, min_amps, max_flow = get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev)
+        print(a, b, c, min_amps, max_flow)
+        df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, a, b, c, min_amps, max_flow))
+        return df
+    else:
+        patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
 
 # gets start & end time for each day of the week returned in a dictionary.
 def weekly_dictionary(operating_period_id, dev):
@@ -309,6 +485,102 @@ def hours_between_weekly(operating_period_id, dev):
     total_hours_year = total_seconds / 3600 * 52  # 3600 seconds in an hour, 52 weeks in a year
 
     return total_hours_year
+
+# Get's the total number of minutes selected per week without duplicates for overlapping time ranges.
+# Can return just the total minutes or the weekly_schedule if you're comparing operating periods
+def minutes_between_experimental(op_id, dev):
+    op_json = get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
+    time_ranges = op_json["response"]["time_range"] # List if time_range IDs
+
+    # List of 10080 False values e.g. = [False, False, False, False, False, False...]
+    # Each index represents a minute in the week. e.g. index 120 would be equal to Monday at 2:00 AM. 121 = Monday at 2:01 AM etc.
+    # The plan is to mark each minute as true based on the user-entered times. This way if we have any overlap the minute will only ever be marked as True so we can't have more than 10080 minutes in a week.
+    weekly_schedule = [False] * 10080
+
+    # For each time range in this operation period
+    for time_range in time_ranges:
+        time_json = get_req("time_range", time_range, dev) # Get the json for each range
+        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] # Will be used to carry over to the next day by adding 1 to the index
+        days = time_json["response"]["repeat_on_weekly"] # Get's the list of days selected by the user.
+
+        if time_json["response"]["all_day"] == True: # If "All Day" is checked
+            for day in days: # Loop through each day selected by the user
+                day_idx = days_of_week.index(day) # Get the index for the day selected by the user from the initialized "days_of_week" list. "Monday" would = 0
+                for minute in range(1440): # Loop through an arbitrary for loop 1440 times
+
+                    # Get the day_idx (Monday = 0) * 1440 mins per day 0 = monday at 12am 1440 = tuesday at 12am
+                    weekly_schedule[day_idx * 1440 + minute] = True # Mark each minute in this entire day as True
+        
+        else: # If "All Day" is NOT checked
+
+            #Get convert start and end times to time objects - Must be formatted like "9:45 PM"
+            start_time = datetime.strptime(time_json["response"]["start_time"], '%I:%M %p').time()
+            end_time = datetime.strptime(time_json["response"]["end_time"], '%I:%M %p').time()
+
+
+            for day in days: # Loop through each day selected by the user
+                day_idx = days_of_week.index(day) # Get the index for the day selected by the user from the initialized "days_of_week" list. "Sunday" would = 6
+                
+                # Total number of minutes from the 12:00 AM for this day
+                start_minute = start_time.hour * 60 + start_time.minute
+                end_minute = end_time.hour * 60 + end_time.minute
+
+                if start_time > end_time: # Over night case (If the start time is earlier than the end time carry over night)
+                    for minute in range(int(start_minute), 1440):
+                        weekly_schedule[day_idx * 1440 + minute] = True
+                    end_day_idx = day_idx + 1 if day_idx < 6 else 0
+
+                    for minute in range(int(end_minute)):
+                        weekly_schedule[end_day_idx * 1440 + minute] = True
+
+                else:
+                    for minute in range(int(start_minute), int(end_minute)):
+                        weekly_schedule[day_idx * 1440 + minute] = True
+    
+    weekly_minutes = sum(weekly_schedule) # Adds together only true values in list -- e.g. sum([False, True, False, True]) = 2
+
+    total_minutes = weekly_minutes * 52
+
+    return total_minutes, weekly_schedule
+                
+
+def experimental_operating_period(df, op_id, dev):
+    op_json = get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
+    time_ranges = op_json["response"]["time_range"] # List if time_range IDs
+
+    filtered_dfs = []
+    
+    for time_range in time_ranges:
+        time_json = get_req("time_range", time_range, dev) # For each time range get the json for each range
+        days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        days = time_json["response"]["repeat_on_weekly"]
+
+
+        if time_json["response"]["all_day"] == True:
+            for day in days:
+                mask = (df.iloc[:, 1].dt.day_name() == day)
+                filtered_dfs.append(df[mask])
+        else:
+
+            start_time = datetime.strptime(time_json["response"]["start_time"], '%I:%M %p').time()
+            end_time = datetime.strptime(time_json["response"]["end_time"], '%I:%M %p').time()
+
+            if start_time > end_time:
+                for day in days:
+                    day_idx = days_of_week.index(day)
+                    end_day = days_of_week[day_idx+1] if day_idx < 6 else days_of_week[0]
+                    mask = (((df.iloc[:, 1].dt.day_name() == day) & (df.iloc[:, 1].dt.time >= start_time)) | ((df.iloc[:, 1].dt.time < end_time) & (df.iloc[:, 1].dt.day_name() == end_day)))
+                    filtered_dfs.append(df[mask])
+            else:
+                # Normal range within the same day
+                for day in days:
+                    mask = ((df.iloc[:, 1].dt.day_name() == day) & (df.iloc[:, 1].dt.time >= start_time) & (df.iloc[:, 1].dt.time < end_time))
+                    filtered_dfs.append(df[mask])
+
+    final_df = pd.concat(filtered_dfs)
+    final_df = final_df.sort_values(by=df.columns[1]).reset_index(drop=True)
+
+    return final_df
 
 # Returns an dictionary of pressure_id: csv_url designed for the pressure csvs in bubble
 def get_pressure_csvs(report_id, pressure_ids, dev):
@@ -489,6 +761,27 @@ def get_avg_pressures(report_id, report_json, dev):
 
             op_per_avg_pressures[operating_period_id] = avg_pressures
     
+    elif op_per_type == "Experimental":
+
+        for operating_period_id in operating_period_ids:
+
+            avg_pressures = {}
+            for id, pressure_csv in pressure_csvs.items():
+
+                df = csv_to_df(pressure_csv) # convert csv_url to dataframe
+
+                if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+                    df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
+                
+                if "exclusion" in report_json["response"]:
+                    df = exclude_from_df(df, report_json, dev)
+
+                df = experimental_operating_period(df, operating_period_id, dev) # filter df by operating period
+                avg_pressure = df.iloc[:, 2].mean()
+                avg_pressures[id] = avg_pressure
+            
+            op_per_avg_pressures[operating_period_id] = avg_pressures
+
     return op_per_avg_pressures
 
 
@@ -578,23 +871,37 @@ def compile_master_df(report_id, dev):
             patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if "CFM" in ac_json["response"]:
-            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-            cfms.append(cfm)
+        if control == "Fixed Speed - Variable Capacity":
+            cfm = 1
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
-
-        if control == "OLOL":
-            if "threshold-value" in ac_json["response"]:
-                threshold = ac_json["response"]["threshold-value"]
+            if "CFM" in ac_json["response"]:
+                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+                cfms.append(cfm)
             else:
-                patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
                 sys.exit()
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
-            df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, slope, intercept))
+        
+        # if "CFM" in ac_json["response"]:
+        #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+        #     cfms.append(cfm)
+        # elif control != "Fixed Speed - Variable Capacity":
+        #     patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #     sys.exit(1)
+        # else:
+        #     cfm = 1
+
+        df = calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
+
+        # if control == "OLOL":
+        #     if "threshold-value" in ac_json["response"]:
+        #         threshold = ac_json["response"]["threshold-value"]
+        #     else:
+        #         patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         sys.exit()
+        #     df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
+        # elif control == "VFD":
+        #     slope, intercept = calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        #     df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, slope, intercept))
         
         current_name_date = df.columns[1]
         current_name_num = df.columns[0]
@@ -628,8 +935,8 @@ def compile_master_df(report_id, dev):
         operating_period_ids = report_json["response"]["operation_period"]
         patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
-        patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
-        sys.exit()
+        print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
+        sys.exit(1)
     
 
     if op_per_type == "Daily":
@@ -669,6 +976,27 @@ def compile_master_df(report_id, dev):
             op_per_kpis.append(kpi)
             hours_diff = hours_between_weekly(operating_period_id, dev)
             op_per_hours_betweens.append(hours_diff)
+    elif op_per_type == "Experimental":
+        avg_acfms = []
+        op_per_avg_kws = []
+        op_per_hours_betweens = []
+        op_per_kpis = []
+        for operating_period_id in operating_period_ids:
+            period_data = experimental_operating_period(master_df, operating_period_id, dev)
+
+            avg_acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
+            avg_acfms.append(avg_acfm)
+
+            avg_kilowatts = period_data.filter(like='Kilowatts').sum(axis=1).mean()
+            op_per_avg_kws.append(avg_kilowatts)
+
+            kpi = avg_kilowatts/avg_acfm
+            op_per_kpis.append(kpi)
+
+            mins_diff, _ = minutes_between_experimental(operating_period_id, dev)
+            hours_diff = mins_diff / 60
+            op_per_hours_betweens.append(hours_diff)
+
         
 
     my_dict["op_per_avg_kws"] = op_per_avg_kws

@@ -106,19 +106,21 @@ def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, a
     
     # For entire Operating Period
     avg_kilowatts = period_data["Kilowatts"].mean() # get the average kw for this operating period
+    print(f"avg_kilowatts: {avg_kilowatts}")
 
-    acfm = period_data["ACFM"].mean() # get the average acfm for this operating period
+
+    acfm = period_data[f"ACFM{idx+1}"].mean()  # get the average acfm for this operating period
 
     flow_percent = (acfm/cfm) * 100
 
     # For 15 min peaks
     peak_15_kw = period_data["Kilowatts"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
-    peak_15_acfm = period_data["ACFM"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+    peak_15_acfm = period_data[f"ACFM{idx+1}"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
     peak_15_flow_percent = (peak_15_acfm/cfm) * 100
 
     # For 2 min peaks
     peak_2_kw = period_data["Kilowatts"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-    peak_2_acfm = period_data["ACFM"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+    peak_2_acfm = period_data[f"ACFM{idx+1}"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
     peak_2_flow_percent = (peak_2_acfm/cfm) * 100
 
     # ready for webhook
@@ -134,7 +136,7 @@ def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, a
         "peak-2-flow-percent": peak_2_flow_percent
         }
     
-
+    print(f"body: {body}")
     # Send the patch to the dataset linked to the right air compressor 
     operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
     dataset_ids = operating_period_json["response"]["dataset_7_2"]
@@ -239,23 +241,31 @@ def get_average_kw(report_id, report_json, dev):
         else:
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
-        
-        if "CFM" in ac_json["response"]:
-            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+
+        if control == "Fixed Speed - Variable Capacity":
+            cfm = 1
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
-        
-        if control == "OLOL":
-            if "threshold-value" in ac_json["response"]:
-                threshold = ac_json["response"]["threshold-value"]
+            if "CFM" in ac_json["response"]:
+                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
             else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
                 sys.exit()
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
+        
+
+        print(f"calculating flow for {ac_name}")
+        df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
+        print(f"calculated flow for {ac_name}")
+        
+        # if control == "OLOL":
+        #     if "threshold-value" in ac_json["response"]:
+        #         threshold = ac_json["response"]["threshold-value"]
+        #     else:
+        #         common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         sys.exit()
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
+        # elif control == "VFD":
+        #     slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
 
         if op_per_type == "Daily":
 
@@ -270,6 +280,15 @@ def get_average_kw(report_id, report_json, dev):
                 
                 # get the average kw for this operating period
                 period_data = common_functions.weekly_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
+
+                dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev)
+        
+        elif op_per_type == "Experimental":
+
+            for operating_period_id in operating_period_ids:
+                
+                # get the average kw for this operating period
+                period_data = common_functions.experimental_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
 
                 dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, ac, cfm, dev)
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)

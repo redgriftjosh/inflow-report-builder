@@ -20,7 +20,7 @@ def get_order_height(hist_id, ac_ids, dev):
             order_height.append(idx+1)
         return order_height
 
-def create_hist(order_height, hist_id, acfms, dev):
+def create_hist_2min_peak(order_height, hist_id, acfms, colours, height, dev):
 
     # I have no idea how this works. I assembled it through trial and error but I do not fully understand it.
 
@@ -72,7 +72,8 @@ def create_hist(order_height, hist_id, acfms, dev):
         x=bin_edges[:-1],
         y=hist_values,
         base=final_base_values,
-        hoverinfo='none'
+        hoverinfo='none',
+        marker=dict(color=colours)
         )])
 
 
@@ -84,7 +85,94 @@ def create_hist(order_height, hist_id, acfms, dev):
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(showticklabels=False, ticklen=0, zeroline=False, fixedrange=True),
-        yaxis=dict(showticklabels=False, ticklen=0, zeroline=False, fixedrange=True),
+        yaxis=dict(showticklabels=False, ticklen=0, zeroline=False, fixedrange=True, range=[0, height]),
+        bargap=0,
+        showlegend=False,
+        margin=dict(t=0, b=0, l=0, r=0),
+        height=200
+    )
+
+    # Show the figure as a static image
+    # html_string = pio.to_html(fig, full_html=False, config={'displayModeBar': False})
+    html_string = pio.to_html(fig, full_html=False, config={'displayModeBar': False, 'staticPlot': True})
+
+
+    total_acfm = sum(hist_values)
+    body = {
+        "total_acfm": total_acfm,
+        "histogram_html": html_string,
+        "individual_acfm": hist_values
+    }
+
+    common_functions.patch_req("histogram_2min_peak_7_2", hist_id, body, dev)
+    print(total_acfm)
+
+def create_hist(order_height, hist_id, acfms, colours, height, dev):
+
+    # I have no idea how this works. I assembled it through trial and error but I do not fully understand it.
+
+    hist_values = acfms
+
+    temp_hist_values = []
+    for idx, order in enumerate(order_height):
+        temp_hist_values.append(hist_values[order_height.index(min(order_height)+idx)])
+
+    print(temp_hist_values)
+
+    temp_order_height = []
+    for idx, order in enumerate(order_height):
+        temp_order_height.append(order_height.index(min(order_height)+idx))
+
+    print(temp_order_height)
+
+    base_values = [0, 3, 4]
+    # goal base = [3, 0, 1]
+
+
+    new_base = []
+
+    for idx, hist in enumerate(hist_values):
+        if idx == 0:
+            new_base = [0]
+        else:
+            temp_base = temp_hist_values[idx-1] + new_base[idx-1] # 3
+            new_base.append(temp_base)
+
+    print(new_base)
+
+
+    final_base_values = []
+    for idx, order in enumerate(temp_order_height):
+        final_base_values.append(new_base[temp_order_height.index(min(temp_order_height)+idx)])
+
+    print(final_base_values)
+
+    bins = len(hist_values) + 1
+    bin_edges = []
+    for i in range(bins):
+        bin_edges.append(i)
+
+    # Plotting
+    # fig = go.Figure(data=[go.Bar(x=bin_edges[:-1], y=hist_values, base=new_base_values)])
+
+    fig = go.Figure(data=[go.Bar(
+        x=bin_edges[:-1],
+        y=hist_values,
+        base=final_base_values,
+        hoverinfo='none',
+        marker=dict(color=colours)
+        )])
+
+
+    # Set axis labels and title
+    # fig.update_layout(title="Modified Histogram with Empty Space",
+    #                 xaxis_title="Value",
+    #                 yaxis_title="Frequency")
+    fig.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showticklabels=False, ticklen=0, zeroline=False, fixedrange=True),
+        yaxis=dict(showticklabels=False, ticklen=0, zeroline=False, fixedrange=True, range=[0, height]),
         bargap=0,
         showlegend=False,
         margin=dict(t=0, b=0, l=0, r=0),
@@ -106,6 +194,34 @@ def create_hist(order_height, hist_id, acfms, dev):
     common_functions.patch_req("histogram_7_2", hist_id, body, dev)
     print(total_acfm)
 
+def acfm_2min_peak_values(dfs, op_id, report_id, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+    op_per_type = report_json["response"]["operating_period_type"]
+    
+    if op_per_type == "Daily":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.daily_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+            acfms.append(max_avg_2)
+        return acfms
+
+    elif op_per_type == "Weekly":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+            acfms.append(max_avg_2)
+        return acfms
+
+    elif op_per_type == "Experimental":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+            acfms.append(max_avg_2)
+        return acfms
+
 def acfm_values(dfs, op_id, report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
     op_per_type = report_json["response"]["operating_period_type"]
@@ -123,6 +239,14 @@ def acfm_values(dfs, op_id, report_id, dev):
         acfms = []
         for df in dfs:
             period_data = common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
+            acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
+            acfms.append(acfm)
+        return acfms
+    
+    elif op_per_type == "Experimental":
+        acfms = []
+        for df in dfs:
+            period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
             acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
             acfms.append(acfm)
         return acfms
@@ -190,19 +314,22 @@ def get_df_for_each_ac(ac_ids, report_id, dev):
         if "CFM" in ac_json["response"]:
             cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
+            cfm = 1
+            # common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            # sys.exit(1)
         
-        if control == "OLOL":
-            if "threshold-value" in ac_json["response"]:
-                threshold = ac_json["response"]["threshold-value"]
-            else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
+        df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
+
+        # if control == "OLOL":
+        #     if "threshold-value" in ac_json["response"]:
+        #         threshold = ac_json["response"]["threshold-value"]
+        #     else:
+        #         common_functions.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         sys.exit()
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
+        # elif control == "VFD":
+        #     slope, intercept = common_functions.calculate_slope_intercept(report_id, ac_json, cfm, volts, dev)
+        #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
         
         my_dfs.append(df)
     return my_dfs
@@ -251,6 +378,33 @@ def reset_histogram_7_2(report_id, dev):
 
         common_functions.patch_req("operation_period", op_id, body={"histogram_7_2": response["id"]}, dev=dev)
 
+def get_hist_2min_peak_id(op_id, dev):
+    print(f"op_id: {op_id}")
+    op_json = common_functions.get_req('operation_period', op_id, dev)
+    print(f"op_json: {op_json}")
+    hist_2min_peak_id = op_json['response'].get('histogram_2min_peak_7_2')
+    print(f"hist_2min_peak_id: {hist_2min_peak_id}")
+    return hist_2min_peak_id
+
+def get_ac_colours(ac_ids, dev):
+    colours = []
+
+    for ac_id in ac_ids:
+        ac_json = common_functions.get_req('air_compressor', ac_id, dev)
+        colour = ac_json['response'].get('colour')
+        colours.append(colour)
+    
+    return colours
+
+def get_heighest_hist(acfms, max_avg_2_acfms):
+    acfms_total = sum(acfms)
+    max_avg_2_acfms_total = sum(max_avg_2_acfms)
+
+    if max_avg_2_acfms_total > acfms_total:
+        return max_avg_2_acfms_total
+    else:
+        return acfms_total
+
 def start():
     data = json.loads(sys.argv[1]) # Proper Code. Keep this
     dev = data.get('dev')
@@ -262,6 +416,7 @@ def start():
     # get Air Compressor IDs so we can verify the right number of order height numbers.
     report_id = data.get('report_id')
     ac_ids = get_ac_ids(report_id, dev)
+    colours = get_ac_colours(ac_ids, dev)
 
     # now we're storing the order of the bars as a list i.e. [1, 3, 4, 2]
     hist_id = data.get('hist_id')
@@ -270,11 +425,19 @@ def start():
     # reset_histogram_7_2(report_id, dev)
     op_id = get_op_id(report_id, hist_id, dev)
 
+    hist_2min_peak_id = get_hist_2min_peak_id(op_id, dev)
+    print(f"hist_2min_peak_id: {hist_2min_peak_id}")
+
     dfs = get_df_for_each_ac(ac_ids, report_id, dev)
     acfms = acfm_values(dfs, op_id, report_id, dev) # returns acfm per ac list = [432, 234, 234]
+    print(f"acfms: {acfms}")
+    max_avg_2_acfms = acfm_2min_peak_values(dfs, op_id, report_id, dev)
+
+    hist_height = get_heighest_hist(acfms, max_avg_2_acfms)
 
     common_functions.patch_req("Report", report_id, body={"loading": f"Creating Your Histogram Now...", "is_loading_error": "no"}, dev=dev)
-    create_hist(order_height, hist_id, acfms, dev)
+    create_hist(order_height, hist_id, acfms, colours, hist_height, dev)
+    create_hist_2min_peak(order_height, hist_2min_peak_id, max_avg_2_acfms, colours, hist_height, dev)
     
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
