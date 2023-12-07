@@ -761,6 +761,27 @@ def get_avg_pressures(report_id, report_json, dev):
 
             op_per_avg_pressures[operating_period_id] = avg_pressures
     
+    elif op_per_type == "Experimental":
+
+        for operating_period_id in operating_period_ids:
+
+            avg_pressures = {}
+            for id, pressure_csv in pressure_csvs.items():
+
+                df = csv_to_df(pressure_csv) # convert csv_url to dataframe
+
+                if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+                    df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
+                
+                if "exclusion" in report_json["response"]:
+                    df = exclude_from_df(df, report_json, dev)
+
+                df = experimental_operating_period(df, operating_period_id, dev) # filter df by operating period
+                avg_pressure = df.iloc[:, 2].mean()
+                avg_pressures[id] = avg_pressure
+            
+            op_per_avg_pressures[operating_period_id] = avg_pressures
+
     return op_per_avg_pressures
 
 
@@ -914,8 +935,8 @@ def compile_master_df(report_id, dev):
         operating_period_ids = report_json["response"]["operation_period"]
         patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
-        patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
-        sys.exit()
+        print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
+        sys.exit(1)
     
 
     if op_per_type == "Daily":

@@ -85,8 +85,8 @@ def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
         kwh_off_peak = elec_entry_json["response"]["kwh_off_peak"] * (num_months / 12)
         kwh_off_peak_list.append(kwh_off_peak)
 
-    blended_on_peak = sum(kwh_on_peak_list) / len(kwh_on_peak_list)
-    blended_off_peak = sum(kwh_off_peak_list) / len(kwh_off_peak_list)
+    blended_on_peak = sum(kwh_on_peak_list)
+    blended_off_peak = sum(kwh_off_peak_list)
 
     on_peak_start = datetime.strptime(elec_provider_json["response"]["on_peak_start"], '%I:%M %p').time()
     off_peak_start = datetime.strptime(elec_provider_json["response"]["off_peak_start"], '%I:%M %p').time()
