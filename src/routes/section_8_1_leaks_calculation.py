@@ -27,30 +27,30 @@ def get_section_8_1_inputs(eco_table_8_1_id, dev):
 
     return cost_per_leak_repair, multiply_factor, additional_value, leak_incentive_value, percent_or_o_and_m_symbol, per_leak_or_kwh
 
-def get_total_annual_operating_hours(report_json, dev):
-    if report_json["response"]["operating_period_type"] != "Experimental":
-        op_ids = report_json["response"]["operation_period"]
-        hrs_yr = []
-        for id in op_ids:
-            op_json = common_functions.get_req("operation_period", id, dev)
-            hrs = op_json["response"]["Hours/yr"]
-            hrs_yr.append(hrs)
+# def get_total_annual_operating_hours(report_json, dev):
+#     if report_json["response"]["operating_period_type"] != "Experimental":
+#         op_ids = report_json["response"]["operation_period"]
+#         hrs_yr = []
+#         for id in op_ids:
+#             op_json = common_functions.get_req("operation_period", id, dev)
+#             hrs = op_json["response"]["Hours/yr"]
+#             hrs_yr.append(hrs)
         
-        total_hrs = sum(hrs_yr)
+#         total_hrs = sum(hrs_yr)
 
-        return total_hrs
-    else:
-        op_ids = report_json["response"]["operation_period"]
-        base_weekly_schedule = [False] * 10080
-        for id in op_ids:
-            _, weekly_schedule = common_functions.minutes_between_experimental(id, dev)
-            for i in range(10080):
-                if base_weekly_schedule[i] == False:   
-                    base_weekly_schedule[i] = weekly_schedule[i]
+#         return total_hrs
+#     else:
+#         op_ids = report_json["response"]["operation_period"]
+#         base_weekly_schedule = [False] * 10080
+#         for id in op_ids:
+#             _, weekly_schedule = common_functions.minutes_between_experimental(id, dev)
+#             for i in range(10080):
+#                 if base_weekly_schedule[i] == False:   
+#                     base_weekly_schedule[i] = weekly_schedule[i]
         
-        weekly_hrs = sum(base_weekly_schedule) / 60
-        total_hrs = weekly_hrs * 52
-        return total_hrs
+#         weekly_hrs = sum(base_weekly_schedule) / 60
+#         total_hrs = weekly_hrs * 52
+#         return total_hrs
 
 
 def calculate_dollars_per_year(report_json, kw_demand_15min, kwh_annual, dev):
@@ -148,7 +148,7 @@ def get_dependencies(report_json, dev):
     num_leaks, total_cfm = get_num_leaks(report_json, dev)
     peak_acfm_15min = report_json["response"]["15 Min Peak Flow"]
     kw_max_avg_15 = report_json["response"]["kw_max_avg_15"]
-    total_op_hours = get_total_annual_operating_hours(report_json, dev)
+    total_op_hours = common_functions.get_total_annual_operating_hours(report_json, dev)
     baseline_kwh_per_year = get_baseline_kwh_per_year(report_json, dev)
 
     return num_leaks, total_cfm,  peak_acfm_15min, kw_max_avg_15, total_op_hours, baseline_kwh_per_year

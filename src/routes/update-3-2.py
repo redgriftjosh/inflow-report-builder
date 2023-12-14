@@ -33,20 +33,23 @@ my_dict_compile_master = common_functions.compile_master_df(report_id, dev)
 operating_period_ids = my_dict_compile_master["operating_period_ids"]
 
 master_df = my_dict_compile_master["master_df"]
+master_df_pressure = my_dict_compile_master["master_df_pressure"]
 
 def update_op_periods(my_dict_compile_master, operating_period_ids):
     op_per_avg_kws = my_dict_compile_master["op_per_avg_kws"]
     op_per_avg_acfms = my_dict_compile_master["op_per_avg_acfms"]
+    op_per_peak_15min_acfms = my_dict_compile_master["op_per_peak_15min_acfms"]
     op_per_hours_betweens = my_dict_compile_master["op_per_hours_betweens"]
     op_per_kpis = my_dict_compile_master["op_per_kpis"]
 
-    for operating_period_id, op_per_avg_kw, op_per_avg_acfm, op_per_hours_between, op_per_kpi in zip(operating_period_ids, op_per_avg_kws, op_per_avg_acfms, op_per_hours_betweens, op_per_kpis):
+    for operating_period_id, op_per_avg_kw, op_per_avg_acfm, op_per_peak_15min_acfm, op_per_hours_between, op_per_kpi in zip(operating_period_ids, op_per_avg_kws, op_per_avg_acfms, op_per_peak_15min_acfms, op_per_hours_betweens, op_per_kpis):
         operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
         operating_period = operating_period_json["response"]["Name"]
         common_functions.patch_req("Report", report_id, body={"loading": f"Populating {operating_period}...", "is_loading_error": "no"}, dev=dev)
         body = {
             "kW": op_per_avg_kw,
             "ACFM Made": op_per_avg_acfm,
+            "peak_15min_acfm": op_per_peak_15min_acfm,
             "Hours/yr": op_per_hours_between,
             "KPI": op_per_kpi
         }
@@ -177,10 +180,15 @@ def pressure_peaks(report_id, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Populating Peak Pressure Demands...", "is_loading_error": "no"}, dev=dev)
     report_json = common_functions.get_req("Report", report_id, dev)
     if "pressure_sensor" in report_json["response"] and report_json["response"]["pressure_sensor"] != []:
-        pressure_peaks = common_functions.get_pressure_peaks(report_id, report_json, dev)
+        pressure_peaks = common_functions.get_pressure_peaks(report_id, report_json, master_df_pressure, dev)
 
         for id, pressure_peak in pressure_peaks.items():
             common_functions.patch_req("pressure_sensor", id, pressure_peak, dev)
+
+def total_annual_operating_hours(report_id, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+    hours = common_functions.get_total_annual_operating_hours(report_json, dev)
+    common_functions.patch_req("report", report_id, body={"total_hours": hours}, dev=dev)
 
 update_op_periods(my_dict_compile_master, operating_period_ids)
 
@@ -191,3 +199,5 @@ update_pressures(report_id)
 pressure_peaks(report_id, dev)
 
 acfm_graph_3_min(master_df, report_id)
+
+total_annual_operating_hours(report_id, dev)

@@ -582,6 +582,31 @@ def experimental_operating_period(df, op_id, dev):
 
     return final_df
 
+def get_total_annual_operating_hours(report_json, dev):
+    if report_json["response"]["operating_period_type"] != "Experimental":
+        op_ids = report_json["response"]["operation_period"]
+        hrs_yr = []
+        for id in op_ids:
+            op_json = get_req("operation_period", id, dev)
+            hrs = op_json["response"]["Hours/yr"]
+            hrs_yr.append(hrs)
+        
+        total_hrs = sum(hrs_yr)
+
+        return total_hrs
+    else:
+        op_ids = report_json["response"]["operation_period"]
+        base_weekly_schedule = [False] * 10080
+        for id in op_ids:
+            _, weekly_schedule = minutes_between_experimental(id, dev)
+            for i in range(10080):
+                if base_weekly_schedule[i] == False:   
+                    base_weekly_schedule[i] = weekly_schedule[i]
+        
+        weekly_hrs = sum(base_weekly_schedule) / 60
+        total_hrs = weekly_hrs * 52
+        return total_hrs
+
 # Returns an dictionary of pressure_id: csv_url designed for the pressure csvs in bubble
 def get_pressure_csvs(report_id, pressure_ids, dev):
     pressure_csvs = {}
@@ -604,6 +629,8 @@ def csv_to_df(csv_url):
     csv_data = StringIO(response.text) # Convert CSV into text of some sort
     
     df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
+
+    df = df.iloc[:, :3]
 
     return df
 
@@ -666,8 +693,32 @@ def sanitize_filename(filename):
     
     return sanitized
 
+def get_pressure_low_15(df, report_json, id, dev):
+    if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+        df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
+
+    if "exclusion" in report_json["response"]:
+        df = exclude_from_df(df, report_json, dev)
+
+    try:
+        threshold = report_json["response"]["low_15_min_acfm_threshold"]
+    except:
+        print(f"Could not find threshold value")
+        threshold = 0
+    
+    print(f"threshold: {threshold}")
+
+    filtered_df = df[df.filter(like='ACFM').sum(axis=1) >= threshold]
+
+    filtered_df.to_csv('filtered_data_with_pressure.csv', index=False)
+    
+    pressure_low_15 = filtered_df.filter(like=id)[::-1].rolling(window=75, min_periods=75).mean()[::-1].min().iloc[0]
+    print(f"pressure_low_15: {pressure_low_15}")
+
+    return pressure_low_15
+
 # Returns a Dictionary = {"pressure_id": {"15-min-peak": 123, "10-min-peak": 321, etc..}, etc..}
-def get_pressure_peaks(report_id, report_json, dev):
+def get_pressure_peaks(report_id, report_json, master_df_pressure, dev):
     pressure_ids = report_json["response"]["pressure_sensor"]
 
     pressure_peaks = {}
@@ -693,7 +744,10 @@ def get_pressure_peaks(report_id, report_json, dev):
         pressure_peak_5 = df.iloc[:, 2][::-1].rolling(window=25, min_periods=25).mean()[::-1].fillna(0).max()
         pressure_peak_3 = df.iloc[:, 2][::-1].rolling(window=15, min_periods=15).mean()[::-1].fillna(0).max()
         pressure_peak_2 = df.iloc[:, 2][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-        pressure_low_15 = df.iloc[:, 2][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).min()
+        # pressure_low_15 = df.iloc[:, 2][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).min()
+
+        pressure_low_15 = get_pressure_low_15(master_df_pressure, report_json, id, dev)
+        
 
         pressure_peaks[id] = {
             "15-min-peak": pressure_peak_15,
@@ -785,7 +839,52 @@ def get_avg_pressures(report_id, report_json, dev):
     return op_per_avg_pressures
 
 
+def get_low_15_min_acfm(df, report_json):
+    try:
+        threshold = report_json["response"]["low_15_min_acfm_threshold"]
+    except:
+        print(f"Could not find threshold value")
+        threshold = 0
+    
+    print(f"threshold: {threshold}")
 
+    filtered_df = df[df.filter(like='ACFM').sum(axis=1) >= threshold]
+
+    filtered_df.to_csv('filtered_data.csv', index=False)
+
+    low_avg_15 = filtered_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].min()
+    print(f"low_avg_15: {low_avg_15}")
+
+    return low_avg_15
+
+def add_pressure_to_master_df(master_df, report_id, dev):
+    report_json = get_req("report", report_id, dev)
+
+    master_df_pressure = None
+
+    low_pressures_15 = []
+
+    if "pressure_sensor" in report_json["response"]:
+        pressure_sensors = report_json["response"]["pressure_sensor"]
+        pressure_csvs = get_pressure_csvs(report_id, pressure_sensors, dev)
+
+        for idx, (id, pressure_csv) in enumerate(pressure_csvs.items()):
+            df = csv_to_df(pressure_csv)
+
+            current_name_date = df.columns[1]
+            current_name_num = df.columns[0]
+            current_name_pressure = df.columns[2]
+            df.rename(columns={current_name_date: f"Date{idx+100}", current_name_num: f"Num{idx+100}", current_name_pressure: f"Pressure{id}"}, inplace=True)
+            
+            if master_df_pressure is None:
+                master_df_pressure = pd.merge(master_df, df, left_on=f"Date1", right_on=f"Date{idx+100}", how="outer")
+
+            else:
+                master_df_pressure = pd.merge(master_df_pressure, df, left_on=f"Date1", right_on=f"Date{idx+100}", how="outer")
+
+        return master_df_pressure
+    else:
+        return None
 
 def compile_master_df(report_id, dev):
     report_json = get_req("report", report_id, dev)
@@ -918,6 +1017,8 @@ def compile_master_df(report_id, dev):
             patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
+    master_df_pressure = add_pressure_to_master_df(master_df, report_id, dev)
+
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = trim_df(report_json, master_df, dev)
@@ -978,6 +1079,7 @@ def compile_master_df(report_id, dev):
             op_per_hours_betweens.append(hours_diff)
     elif op_per_type == "Experimental":
         avg_acfms = []
+        op_per_peak_15min_acfms = []
         op_per_avg_kws = []
         op_per_hours_betweens = []
         op_per_kpis = []
@@ -986,6 +1088,9 @@ def compile_master_df(report_id, dev):
 
             avg_acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
             avg_acfms.append(avg_acfm)
+
+            op_per_peak_15min_acfm = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+            op_per_peak_15min_acfms.append(op_per_peak_15min_acfm)
 
             avg_kilowatts = period_data.filter(like='Kilowatts').sum(axis=1).mean()
             op_per_avg_kws.append(avg_kilowatts)
@@ -997,6 +1102,8 @@ def compile_master_df(report_id, dev):
             hours_diff = mins_diff / 60
             op_per_hours_betweens.append(hours_diff)
 
+
+
         
 
     my_dict["op_per_avg_kws"] = op_per_avg_kws
@@ -1004,6 +1111,9 @@ def compile_master_df(report_id, dev):
 
     my_dict["op_per_avg_acfms"] = avg_acfms
     print("Added: op_per_avg_acfms")
+
+    my_dict["op_per_peak_15min_acfms"] = op_per_peak_15min_acfms
+    print("Added: op_per_peak_15min_acfms")
 
     my_dict["operating_period_ids"] = operating_period_ids
     print("Added: operating_period_ids")
@@ -1024,7 +1134,8 @@ def compile_master_df(report_id, dev):
     max_avg_5 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=25, min_periods=25).mean()[::-1].fillna(0).max()
     max_avg_3 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=15, min_periods=15).mean()[::-1].fillna(0).max()
     max_avg_2 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-    low_avg_15 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).min()
+
+    low_avg_15 = get_low_15_min_acfm(master_df, report_json)
 
     # compressor_capacity(report_id, cfms, max_flow_op, max_avg_15, max_avg_2)
 
@@ -1067,6 +1178,9 @@ def compile_master_df(report_id, dev):
 
     my_dict["master_df_excluded"] = master_df
     print("Added: master_df")
+
+    my_dict["master_df_pressure"] = master_df_pressure
+    print("Added: master_df_pressure")
 
 
     return my_dict
