@@ -1174,7 +1174,7 @@ def get_low_15_min_acfm_1(df, report_json, report_id, dev):
 
     filtered_df.to_csv('filtered_data_february_one.csv', index=False)
 
-    low_avg_15 = filtered_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=300, min_periods=300).mean()[::-1].min()
+    low_avg_15 = filtered_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].min()
     print(f"low_avg_15: {low_avg_15}")
 
     return low_avg_15
