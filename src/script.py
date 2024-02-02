@@ -10,10 +10,10 @@ def run_script(data, script):
     script_path = os.path.join('routes', script)
 
     # This one normally pushes all console error messages as a response to the post req
-    result = subprocess.run(['python3', script_path, serialized_data], text=True, stderr=subprocess.PIPE)
+    # result = subprocess.run(['python3', script_path, serialized_data], text=True, stderr=subprocess.PIPE)
 
     # I wanted to see the errors in the console
-    # result = subprocess.run(['python3', script_path, serialized_data])
+    result = subprocess.run(['python3', script_path, serialized_data])
     
     if result.returncode == 0:
         # If the script was successful, return the success message

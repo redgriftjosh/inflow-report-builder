@@ -190,6 +190,117 @@ def get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev):
 
     return a, b, c, min_amps, max_flow
 
+def get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pressure, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+    if "rated-psig" in ac_json["response"]:
+        rated_psig = ac_json["response"]["rated-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    correction_factor = 1 -((rated_psig - pressure) * 0.005)
+
+    if "pf" in ac_json["response"]:
+        pf = ac_json["response"]["pf"]
+    else:
+        pf = 0.97
+    
+
+    if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
+        slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
+        if len(slope_entry_ids) < 3:
+            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    else:
+        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    power_input_kws = []
+    capacity_acfms = []
+    kw_to_amps = []
+    corrected_amps = []
+    for idx, slope_entry_id in enumerate(slope_entry_ids):
+        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        
+        if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
+            power_input_kw = slope_json["response"]["power-input-kw"]
+            power_input_kws.append(power_input_kw)
+
+            capacity_acfm = slope_json["response"]["capacity-acfm"]
+            capacity_acfms.append(capacity_acfm)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    
+        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
+        kw_to_amps.append(kw_to_amp)
+
+        corrected_amp = kw_to_amp * correction_factor
+        corrected_amps.append(corrected_amp)
+
+    coefficients = np.polyfit(capacity_acfms, corrected_amps, 2)
+    a, b, c = coefficients
+
+    return a, b, c
+
+def get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setpoint_psig, pf, pressure, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+    correction_factor = 1 -((rated_psig - pressure) * 0.005)
+    
+
+    if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
+        slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
+        if len(slope_entry_ids) < 3:
+            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    else:
+        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    power_input_kws = []
+    capacity_acfms = []
+    kw_to_amps = []
+    corrected_amps = []
+    corrected_acfms = []
+    for idx, slope_entry_id in enumerate(slope_entry_ids):
+        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        
+        if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
+            power_input_kw = slope_json["response"]["power-input-kw"]
+            power_input_kws.append(power_input_kw)
+
+            capacity_acfm = slope_json["response"]["capacity-acfm"]
+            capacity_acfms.append(capacity_acfm)
+        else:
+            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+    
+        kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
+        kw_to_amps.append(kw_to_amp)
+
+        corrected_amp = kw_to_amp * correction_factor
+        corrected_amps.append(corrected_amp)
+
+        if idx == 0:
+            corrected_acfm = cfm
+        else:
+            corrected_acfm = cfm / capacity_acfms[0] * capacity_acfm
+        print(f"Corrected ACFM: {corrected_acfm}")
+        corrected_acfms.append(corrected_acfm)
+
+    coefficients = np.polyfit(corrected_acfms, corrected_amps, 2) # Inverse X and Y axis to get new polonomial vars
+    a, b, c = coefficients
+
+    return a, b, c
+
 def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
@@ -308,6 +419,43 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
 
     return slope, intercept, min_amps
 
+def calculate_inverse_slope_intercept(report_id, ac_json, cfm, volts, pressure, dev):
+    if "Customer CA" in ac_json["response"]:
+        ac_name = ac_json["response"]["Customer CA"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "rated-psig" in ac_json["response"]:
+        rated_psig = ac_json["response"]["rated-psig"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    correction_factor = 1 -((rated_psig - pressure) * 0.005)
+    
+    if "kw_at_full_load" in ac_json["response"]:
+        kw_at_full_load = ac_json["response"]["kw_at_full_load"]
+    else:
+        patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+    
+    if "pf" in ac_json["response"]:
+        pf = ac_json["response"]["pf"]
+    else:
+        pf = 0.97
+
+    kw_to_amp = (1000 * kw_at_full_load) / (sqrt(3) * pf * volts)
+
+    corrected_amp = kw_to_amp * correction_factor
+
+    corrected_amps = [corrected_amp, (corrected_amp * 0.7)]
+    corrected_acfms = [cfm, 0]
+
+    slope, intercept = np.polyfit(corrected_acfms, corrected_amps, 1)
+
+    return slope, intercept
+
 def calculate_vfd_acfm(amps, a, b, c, min_amps, max_flow):
 
     init_flow = a * amps**2 + b * amps + c
@@ -358,6 +506,160 @@ def calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_i
     else:
         patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
+
+def get_highest_cfm_from_slope_entries(ac_json, dev):
+    slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
+
+    capacity_acfms = []
+
+    for slope_entry_id in slope_entry_ids:
+        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        
+        capacity_acfm = slope_json["response"]["capacity-acfm"]
+        capacity_acfms.append(capacity_acfm)
+    
+    high_cfm = max(capacity_acfms)
+
+    return high_cfm
+
+def get_max_cfm(ac_id, dev):
+    ac_json = get_req("air_compressor", ac_id, dev)
+    control = ac_json["response"]["Control Type"]
+
+    if control == "Variable Speed - VFD":
+        cfm = ac_json["response"]["CFM"]
+
+        return cfm
+    
+    elif control == "Fixed Speed - OLOL":
+        cfm = ac_json["response"]["CFM"] # Capacity Flow
+
+        return cfm
+        
+    elif control == "Fixed Speed - Inlet Modulation":
+        cfm = ac_json["response"]["CFM"] # Capacity Flow
+
+        return cfm
+    
+    elif control == "Fixed Speed - Variable Capacity":
+
+        cfm = get_highest_cfm_from_slope_entries(ac_json, dev)
+
+        return cfm
+
+def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, dev):
+    ac_json = get_req("air_compressor", ac_id, dev)
+    control = ac_json["response"]["Control Type"]
+    ac_name = ac_json["response"]["Customer CA"]
+
+    if control == "Variable Speed - VFD":
+        cfm = ac_json["response"]["CFM"]
+        rated_psig = ac_json["response"]["rated-psig"]
+        setpoint_psig = ac_json["response"]["setpoint-psig"]
+        pf = ac_json["response"]["pf"]
+        volts = ac_json["response"]["volts"]
+        
+        a, b, c  = get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setpoint_psig, pf, pressure, dev) # For ECO Scenarios not for regular report use.
+
+        amps = (a * (acfm * acfm) + b * acfm + c)
+        avg_kw = (amps * sqrt(3) * pf * volts) / 1000
+
+        return avg_kw
+    
+    elif control == "Fixed Speed - OLOL":
+        cfm = ac_json["response"]["CFM"] # Capacity Flow
+        kw_at_full_load = ac_json["response"]["kw_at_full_load"]
+
+        correction_factor = acfm / cfm
+        avg_kw = kw_at_full_load * correction_factor
+
+        return avg_kw
+        
+    elif control == "Fixed Speed - Inlet Modulation":
+        pf = ac_json["response"]["pf"]
+
+        slope, intercept = calculate_inverse_slope_intercept(report_id, ac_json, cfm, volts, pressure, dev)
+
+        amps = acfm * slope + intercept
+        avg_kw = (amps * sqrt(3) * pf * volts) / 1000
+
+        return avg_kw
+    
+    elif control == "Fixed Speed - Variable Capacity":
+        pf = ac_json["response"]["pf"]
+
+        a, b, c = get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pressure, dev)
+
+        amps = acfm * slope + intercept
+        avg_kw = (amps * sqrt(3) * pf * volts) / 1000
+
+        return avg_kw
+        
+    else:
+        patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+def get_cost_to_operate(report_id, kw_demand_15min, kwh_annual, dev):
+    report_json = get_req("report", report_id, dev)
+    try:
+        elec_provider_id = report_json["response"]["electrical_provider"]
+    except:
+        print(f"Can't find any Electrical Utility info!", file=sys.stderr)
+        sys.exit(1)
+    elec_provider_json = get_req("electrical_provider", elec_provider_id, dev)
+    elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
+
+    on_peak_list = []
+
+    kwh_on_peak_list = []
+    kwh_off_peak_list = []
+
+    for elec_entry_id in elec_entry_ids:
+        elec_entry_json = get_req("electrical_provider_entry", elec_entry_id, dev)
+        month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
+        month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
+        kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
+
+        if month_start <= month_end:
+            num_months = month_end - month_start + 1
+        else:
+            # If the start month is after the end month, it implies the end month is in the next year
+            num_months = (12 - month_start) + month_end + 1
+        
+        on_peak = kw_demand_15min * kw_on_peak * num_months
+            
+        on_peak_list.append(on_peak)
+
+        kwh_on_peak = elec_entry_json["response"]["kwh_on_peak"] * (num_months / 12)
+        kwh_on_peak_list.append(kwh_on_peak)
+
+        kwh_off_peak = elec_entry_json["response"]["kwh_off_peak"] * (num_months / 12)
+        kwh_off_peak_list.append(kwh_off_peak)
+
+    blended_on_peak = sum(kwh_on_peak_list)
+    blended_off_peak = sum(kwh_off_peak_list)
+
+    on_peak_start = datetime.strptime(elec_provider_json["response"]["on_peak_start"], '%I:%M %p').time()
+    off_peak_start = datetime.strptime(elec_provider_json["response"]["off_peak_start"], '%I:%M %p').time()
+
+    # Create datetime objects by combining the time with today's date
+    today = datetime.today().date()
+    on_peak_start_dt = datetime.combine(today, on_peak_start)
+    off_peak_start_dt = datetime.combine(today, off_peak_start)
+
+    # If off_peak_start is the next day
+    if off_peak_start < on_peak_start:
+        off_peak_start_dt += timedelta(days=1)
+
+    # Calculate the difference between the two datetime objects
+    on_peak_seconds = (off_peak_start_dt - on_peak_start_dt).total_seconds()
+
+    on_peak_days = on_peak_seconds / (24 * 60 * 60)
+
+    cost_to_operate = sum(on_peak_list) + (kwh_annual * blended_on_peak * on_peak_days) + (kwh_annual * blended_off_peak * (1 - on_peak_days))
+
+    return cost_to_operate
+
 
 
 # gets start & end time for each day of the week returned in a dictionary.
@@ -582,6 +884,7 @@ def experimental_operating_period(df, op_id, dev):
 
     return final_df
 
+# Returns total hours selected in the year. Example 8760
 def get_total_annual_operating_hours(report_json, dev):
     if report_json["response"]["operating_period_type"] != "Experimental":
         op_ids = report_json["response"]["operation_period"]
@@ -693,6 +996,14 @@ def sanitize_filename(filename):
     
     return sanitized
 
+def get_header_id(report_json, dev):
+    pressure_ids = report_json["response"]["pressure_sensor"]
+    for pressure in pressure_ids:
+        pressure_json = get_req("pressure_sensor", pressure, dev)
+        header = pressure_json["response"]["header"]
+        if header == True:
+            return pressure
+
 def get_pressure_low_15(df, report_json, id, dev):
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
@@ -708,7 +1019,9 @@ def get_pressure_low_15(df, report_json, id, dev):
     
     print(f"threshold: {threshold}")
 
-    filtered_df = df[df.filter(like='ACFM').sum(axis=1) >= threshold]
+    header_id = get_header_id(report_json, dev)
+
+    filtered_df = df[df[f"Pressure{header_id}"] >= threshold]
 
     filtered_df.to_csv('filtered_data_with_pressure.csv', index=False)
     
@@ -838,6 +1151,33 @@ def get_avg_pressures(report_id, report_json, dev):
 
     return op_per_avg_pressures
 
+
+def get_low_15_min_acfm_1(df, report_json, report_id, dev):
+    try:
+        threshold = report_json["response"]["low_15_min_acfm_threshold"]
+    except:
+        print(f"Could not find threshold value")
+        threshold = 0
+
+    header_id = get_header_id(report_json, dev)
+
+    if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+        df = trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
+
+    if "exclusion" in report_json["response"]:
+        df = exclude_from_df(df, report_json, dev)
+    
+
+    print(f"threshold: {threshold}")
+
+    filtered_df = df[df[f"Pressure{header_id}"] >= threshold]
+
+    filtered_df.to_csv('filtered_data_february_one.csv', index=False)
+
+    low_avg_15 = filtered_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=300, min_periods=300).mean()[::-1].min()
+    print(f"low_avg_15: {low_avg_15}")
+
+    return low_avg_15
 
 def get_low_15_min_acfm(df, report_json):
     try:
@@ -1022,6 +1362,7 @@ def compile_master_df(report_id, dev):
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = trim_df(report_json, master_df, dev)
+        # master_df_pressure = trim_df(report_json, master_df, dev)
 
     my_dict["master_df"] = master_df
     print("Added: master_df")
@@ -1029,6 +1370,7 @@ def compile_master_df(report_id, dev):
     if "exclusion" in report_json["response"]:
         patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = exclude_from_df(master_df, report_json, dev)
+        # master_df_pressure = exclude_from_df(master_df, report_json, dev)
 
     if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
@@ -1135,7 +1477,13 @@ def compile_master_df(report_id, dev):
     max_avg_3 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=15, min_periods=15).mean()[::-1].fillna(0).max()
     max_avg_2 = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
 
-    low_avg_15 = get_low_15_min_acfm(master_df, report_json)
+    master_df_pressure.to_csv("February_one.csv",index=False)
+
+    # We used to do it using ACFM as a threshold--"Only get ACFM above 1 and do rolling avg on that"
+    # but OLOLs frequently shut off so we were getting numbers too high.
+    # low_avg_15 = get_low_15_min_acfm(master_df, report_json)
+
+    low_avg_15 = get_low_15_min_acfm_1(master_df_pressure, report_json, report_id, dev)
 
     # compressor_capacity(report_id, cfms, max_flow_op, max_avg_15, max_avg_2)
 

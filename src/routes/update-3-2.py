@@ -104,48 +104,57 @@ def update_pressures(report_id):
 
 def acfm_graph_3_min(master_df, report_id):
     common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph: ACFM Monitoring Period...", "is_loading_error": "no"}, dev=dev)
-    master_df['3 Minute Average ACFMt'] = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=15, min_periods=15).mean()[::-1].fillna(0)
+
+    report_json = common_functions.get_req("report", report_id, dev)
+    period_3_2 = report_json["response"]["period_3_2"]
+    if period_3_2 == "2 minute":
+        master_df['Average ACFM'] = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0)
+    elif period_3_2 == "15 minute":
+        master_df['Average ACFM'] = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0)
+    elif period_3_2 == "1 hour":
+        master_df['Average ACFM'] = master_df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=300, min_periods=300).mean()[::-1].fillna(0)
 
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
         x=np.array(master_df.iloc[:, 1]),
-        y=master_df['3 Minute Average ACFMt'],
+        y=master_df['Average ACFM'],
         mode='markers',  # 'markers' means it's a scatterplot
-        marker=dict(size=10)
+        marker=dict(size=20)
     ))
 
     fig.update_layout(
     title={
         'text': "ACFM Monitoring Period",
-        'font': {'size': 36}  # Adjust title font size
+        'font': {'size': 72},  # Adjust title font size
+        'y': 0.99
     },
     xaxis_title="Timestamp",
     xaxis={
         'title': {
             'text': "Timestamp",
-            'font': {'size': 24}  # Adjust x-axis title font size
+            'font': {'size': 48}  # Adjust x-axis title font size
         },
-        'tickfont': {'size': 24},  # Adjust x-axis tick labels font size
+        'tickfont': {'size': 48},  # Adjust x-axis tick labels font size
         'gridcolor': 'lightgrey',
         'showgrid': True
     },
-    yaxis_title="Full Monitoring - ACFM (3 min avg.)",
+    yaxis_title=f"Full Monitoring - ACFM ({period_3_2} avg.)",
     yaxis={
         'title': {
-            'text': "Full Monitoring - ACFM (3 min avg.)",
-            'font': {'size': 24}  # Adjust y-axis title font size
+            'text': f"Full Monitoring - ACFM ({period_3_2} avg.)",
+            'font': {'size': 48}  # Adjust y-axis title font size
         },
-        'tickfont': {'size': 24},  # Adjust y-axis tick labels font size
+        'tickfont': {'size': 48},  # Adjust y-axis tick labels font size
         'gridcolor': 'lightgrey',
         'showgrid': True
     },
-    legend={'font': {'size': 24}},  # Adjust legend font size
+    legend={'font': {'size': 48}},  # Adjust legend font size
     plot_bgcolor='white',
     paper_bgcolor='white'
     )
 
-    fig.write_image("temp_image.jpeg", width=1920, height=1080)
+    fig.write_image("temp_image.jpeg", width=3840, height=2160)
 
     filename = "temp_image.jpeg"
     with open(filename, "rb") as img_file:

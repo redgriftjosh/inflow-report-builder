@@ -1,8 +1,73 @@
 
+READ temp.py it's better!
+
+{"comment": "Trying to figure out how to structure the whole new proposed and baseline system.",
+"comment1": "We need to have mirrors of all the equipment and operation periods that aren't changable in baseline or proposed secitons.",
+"comment2": "Then we need to find a way to run the same calculations that we already have be infersly calculate kW instead of acfm so that we can compare baselin and proposed.",
+"comment3": "Remember that sometimes he wants to change the baseline."}
 {
-    "report_id": "1697665600466x124847461118842600",
-    "eco_table_8_1_id": "1700246325961x871632769278017500",
-    "dev": "yes"
+    "report": "12345678901234567890",
+    "eco": {[
+        "scenario": {
+            "end_values": {
+                "number": 1,
+                "color": "#FAB515"
+            }
+            "baseline": {
+                "compressors": [{
+                    "control_type": "OLOL",
+                    "max_cfm": 434
+                },
+                {
+                    "control_type": "VFD",
+                    "max_cfm": 434
+                }
+            ]
+
+            },
+            "proposed": {
+
+            }
+        }
+    ]}
+    "operating_period": [
+        {
+            "proposed_compressors"
+        }
+    ]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{
+	"script": "eco_calculations.py",
+    "script_body": {
+        "report_id": "1697665600466x124847461118842600",
+        "dev": "yes",
+        "scenario_id": "1698946215407x140284640608387070",
+        "scope": "proposed"
+    }
 }
 
 
@@ -17,7 +82,8 @@
 
 // section 3-2
 {
-    "report-id": "1698170359783x121929026163965950",
+    "report_id": "1698170359783x121929026163965950",
+    "eco_table_8_1_drain_input": "thisismyid",
     "dev": "yes"
 }
 
