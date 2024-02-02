@@ -407,18 +407,26 @@ def calculate_dryer_row(report_json, baseline_operation_7_1, kw, dev):
     return row_id
 
 def calculate_dryer(report_json, baseline_operation_7_1, dev):
-    dryer_ids = report_json["response"]["dryer"]
+    try:
+        dryer_ids = report_json["response"]["dryer"]
+    except:
+        print(f"No Dryers?", file=sys.stderr)
+        sys.exit(1)
+
     kws = []
 
     for dryer_id in dryer_ids:
         dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        try:
+            connected_to = dryer_json["response"]["connected_to"]
+            full_load_kw = dryer_json["response"]["full_load_kw"]
+            capacity_scfm = dryer_json["response"]["capacity_scfm"]
 
-        connected_to = dryer_json["response"]["connected_to"]
-        full_load_kw = dryer_json["response"]["full_load_kw"]
-        capacity_scfm = dryer_json["response"]["capacity_scfm"]
-
-        type = dryer_json["response"]["type_if_desiccant_dryer"]
-        control = dryer_json["response"]["control"]
+            type = dryer_json["response"]["type_if_desiccant_dryer"]
+            control = dryer_json["response"]["control"]
+        except:
+            print(f"Missing some dryer data make sure all the fields are filled out plz", file=sys.stderr)
+            sys.exit(1)
 
         ac_ids = get_ac_ids_for_dryer(report_json, connected_to, dev)
 

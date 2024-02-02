@@ -78,6 +78,9 @@ def clean_json(my_json, processed_ids):
         "scenario_end_values",
         "scenario_proposed",
         "scenario_differences",
+        "section_5_2",
+        "section_5_1",
+        "section_5",
         "trim"
         ]
 
