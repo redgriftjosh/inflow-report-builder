@@ -84,7 +84,7 @@ def filter_selection(df, start_date, start_time, end_date, end_time, report_id, 
 def create_graph(df, report_id, threshold_psi, section_5_2, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
-    avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= 80].mean()
+    avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= threshold_psi].mean()
 
 
     fig = go.Figure()
