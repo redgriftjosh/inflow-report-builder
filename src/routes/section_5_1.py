@@ -188,6 +188,7 @@ def create_graph(df, period, report_id, section_5_1, dev):
     elif period == "1 hour":
         df["avg_acfm"] = df.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=300, min_periods=300).mean()[::-1].fillna(0)
         peak_acfm = df["avg_acfm"][::-1].rolling(window=300, min_periods=300).mean()[::-1].fillna(0).max()
+        peak_acfm = df["avg_acfm"].fillna(0).max()
     else:
         common_functions.patch_req("Report", report_id, body={"loading": f"No Period Selected", "is_loading_error": "yes"}, dev=dev)
         sys.exit(1)
