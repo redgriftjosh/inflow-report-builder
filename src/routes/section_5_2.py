@@ -39,9 +39,20 @@ def get_dependencies(report_id, dev):
 
     section_5_2 = section_5_json["response"]["section_5_2"]
 
-    threshold_psi = report_json["response"]["low_15_min_acfm_threshold"]
+    section_5_2_json = common_functions.get_req("section_5_2", section_5_2, dev)
 
-    return threshold_psi, section_5_2
+    try:
+        low_psi = section_5_2_json["response"]["low_psi"]
+    except:
+        low_psi = 0
+
+    try:
+        threshold_psi = report_json["response"]["low_15_min_acfm_threshold"]
+    except:
+        threshold_psi = 0
+    
+
+    return threshold_psi, low_psi, section_5_2
 
 def get_df(dev, report_id):
     report_json = common_functions.get_req("report", report_id, dev)
@@ -81,7 +92,7 @@ def filter_selection(df, start_date, start_time, end_date, end_time, report_id, 
         common_functions.patch_req("Report", report_id, body={"loading": f"We're having some trouble Selecting the timerange you specified. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
-def create_graph(df, report_id, threshold_psi, section_5_2, dev):
+def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
     avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= threshold_psi].mean()
@@ -133,7 +144,7 @@ def create_graph(df, report_id, threshold_psi, section_5_2, dev):
         'tickfont': {'size': 48},  # Adjust y-axis tick labels font size
         'gridcolor': 'lightgrey',
         'showgrid': True,
-        'range': [threshold_psi, df.iloc[:, 2].max()]
+        'range': [low_psi, df.iloc[:, 2].max()]
     },
     legend={'font': {'size': 48}},  # Adjust legend font size
     plot_bgcolor='white',
@@ -171,13 +182,13 @@ def create_graph(df, report_id, threshold_psi, section_5_2, dev):
 
 def start():
     dev, report_id = get_payload()
-    threshold_psi, section_5_2 = get_dependencies(report_id, dev)
+    threshold_psi, low_psi, section_5_2 = get_dependencies(report_id, dev)
 
     df = get_df(dev, report_id)
     
     # df = filter_selection(df, start_date, start_time, end_date, end_time, report_id, dev)
 
-    create_graph(df, report_id, threshold_psi, section_5_2, dev)
+    create_graph(df, report_id, threshold_psi, low_psi, section_5_2, dev)
 
 
 

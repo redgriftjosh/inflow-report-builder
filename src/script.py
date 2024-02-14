@@ -2,8 +2,10 @@ from flask import Flask, request, jsonify
 import subprocess
 import os
 import json
+import tempfile
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 def run_script(data, script):
     serialized_data = json.dumps(data)
@@ -22,6 +24,31 @@ def run_script(data, script):
         # If there was an error, return the error message
         error_message = result.stderr.strip() if result.stderr else f"Script failed with return code {result.returncode}"
         return (f"Error: {error_message}", 500)
+
+
+def run_pdf_report(script_body, script_name):
+
+    # Prepare the data as JSON
+    data_to_write = json.dumps({'html': script_body})
+
+    # Write the large data to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, mode='w+t') as tmpfile:
+        tmpfile.write(data_to_write)
+        tmpfile_path = tmpfile.name
+    
+    # Pass the temporary file path as an argument
+    script_path = os.path.join('routes', script_name)
+    result = subprocess.run(['python3', script_path, tmpfile_path])
+    
+    # Remember to delete the temporary file after reading it in your script
+    # os.remove(tmpfile_path)
+
+    if result.returncode == 0:
+        # Return the output from the script if needed, or just a success message
+        return jsonify({'message': 'Success', 'output': result.stdout})
+    else:
+        # Handle errors, e.g., return the error output from the script
+        return jsonify({'error': result.stderr}), 500
 
 # @app.route('/graph-to-pressure-sensor', methods=['POST'])
 # def graph_to_pressure_sensor():
@@ -88,8 +115,10 @@ def run_backend():
     data = request.get_json()
     script_name = data.get('script')
     script_body = data.get('script_body')
-
-    response = run_script(script_body, script_name)
+    if script_name == "pdf_report.py":
+        response = run_pdf_report(script_body, script_name)
+    else:
+        response = run_script(script_body, script_name)
     return response
 
 

@@ -3,6 +3,7 @@ import json
 import common_functions
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 
 # Make sure we have everything we need before running
 def check_dependencies(report_id, report_json, dev):
@@ -361,7 +362,12 @@ def get_cfm_df(report_json, ac_ids, dev):
     master_df[f"Kilowatts"] = master_df.filter(like='ACFM').sum(axis=1).apply(lambda amps: calculate_dryer_kw_row(amps, volts, pf50, amppf, bhp, pf))
 
 def calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm):
-    return full_load_kw * (acfm / capacity_scfm)
+    x = [(capacity_scfm*0.1), capacity_scfm]
+    y = [(full_load_kw*0.55), full_load_kw]
+
+    slope, intercept = np.polyfit(x, y, 1)
+
+    return slope * acfm + intercept
 
 def get_dryer_cfm_loss(capacity_scfm, type):
     if type == "Desiccant Dryer No Heat":

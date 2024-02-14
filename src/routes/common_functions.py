@@ -547,7 +547,8 @@ def get_max_cfm(ac_id, dev):
 
         return cfm
 
-def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, dev):
+
+def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, gal_per_cfm, dev):
     ac_json = get_req("air_compressor", ac_id, dev)
     control = ac_json["response"]["Control Type"]
     ac_name = ac_json["response"]["Customer CA"]
@@ -570,10 +571,26 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, dev):
         cfm = ac_json["response"]["CFM"] # Capacity Flow
         kw_at_full_load = ac_json["response"]["kw_at_full_load"]
 
-        correction_factor = acfm / cfm
-        avg_kw = kw_at_full_load * correction_factor
+        correction_factor = (acfm / cfm) * 100
 
-        return avg_kw
+        # This is what I used to draw the fit curves
+        # https://docs.google.com/spreadsheets/d/1PCHVS9-TH0cGw2-bde5Z1werTVBXaj1hR2C3X3YGZgw/edit#gid=2102930353
+        if gal_per_cfm <= 3:
+            percent_kw = 0.281 + 0.0139*correction_factor - 0.0000676*(correction_factor**2)
+
+        elif gal_per_cfm == 4:
+            percent_kw = 0.265 + 0.0119*correction_factor - 0.000045*(correction_factor**2)
+        
+        elif gal_per_cfm == 5:
+            percent_kw = 0.256 + 0.00955*correction_factor - 0.0000193*(correction_factor**2)
+        
+        elif gal_per_cfm >= 6:
+            percent_kw = 0.259 + 0.00875*correction_factor - 0.0000115*(correction_factor**2)
+
+        print(f"gal_per_cfm: {gal_per_cfm}")
+        print(f"percent_kw: {percent_kw}")
+
+        return kw_at_full_load * percent_kw
         
     elif control == "Fixed Speed - Inlet Modulation":
         pf = ac_json["response"]["pf"]
@@ -599,6 +616,56 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, dev):
         patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
+def get_gal_per_cfm(ac_ids, report_id, dev):
+
+    cfms = []
+    for ac in ac_ids:
+        ac_json = get_req("air_compressor", ac, dev)
+        control = ac_json["response"]["Control Type"]
+
+        if control == "Variable Speed - VFD":
+            cfm = ac_json["response"]["CFM"]
+            cfms.append(cfm)
+        
+        elif control == "Fixed Speed - OLOL":
+            cfm = ac_json["response"]["CFM"]
+            cfms.append(cfm)
+            
+        elif control == "Fixed Speed - Inlet Modulation":
+            cfm = ac_json["response"]["CFM"]
+            cfms.append(cfm)
+        
+        elif control == "Fixed Speed - Variable Capacity":
+            slope_ids = ac_json["response"]["vfd_slope_entries"]
+            slope_cfms = []
+            for id in slope_ids:
+                slope_json = get_req("vfd_slope_entries", id, dev)
+                slope_cfm = slope_json["response"]["capacity-acfm"]
+                slope_cfms.append(slope_cfm)
+            
+            cfm = max(slope_cfms)
+            cfms.append(cfm)
+    
+    total_cfm = sum(cfms)
+
+    report_json = get_req("report", report_id, dev)
+
+    storage_ids = report_json["response"]["storage_tank"] # SHOULD BE GETTING THESE FROM BASELINE 
+
+    sizes = []
+
+    for storage_id in storage_ids:
+        storage_json = get_req("storage_tank", storage_id, dev)
+        size = storage_json["response"]["size_in_gallons"]
+        sizes.append(size)
+    
+    size_in_gallons = sum(sizes)
+    
+
+    return round( size_in_gallons / total_cfm, 0)
+
+
+# Used in drains_4_3.py nvm
 def get_cost_to_operate(report_id, kw_demand_15min, kwh_annual, dev):
     report_json = get_req("report", report_id, dev)
     try:
