@@ -40,7 +40,7 @@ def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
     except:
         acfm_loss = 0
     
-    cycles_per_hour = 60 / off_min if off_min < 0.1 else 0
+    cycles_per_hour = 60 / off_min if off_min > 0.1 else 0
 
     cf_per_cycle = on_sec * (52 / 60) # Currently hard coding 52 CFM can get through the drain
 
