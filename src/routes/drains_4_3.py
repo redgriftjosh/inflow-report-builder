@@ -31,6 +31,9 @@ def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
         off_min = drain_json["response"]["baseline_off_min"]
         on_sec = drain_json["response"]["baseline_on_sec"]
 
+        if off_min == 0 or on_sec == 0:
+            return 0
+
         try:
             acfm_loss = drain_json["response"]["acfm_loss"]
         except:
@@ -43,7 +46,7 @@ def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
         total_acfm_loss = acfm_loss + (cycles_per_hour * cf_per_cycle / 60)
 
 
-        return total_acfm_loss + kw_max_avg_15 / peak_acfm_15_min
+        return total_acfm_loss * kw_max_avg_15 / peak_acfm_15_min
     except:
         return 0
 
