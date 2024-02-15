@@ -61,17 +61,35 @@ def update_op_stats(op_id, report_id, dev):
 
     cfm_changes = []
 
-    if scenario_differences_json["response"]["leak_cfm_change"] != 0 or scenario_differences_json["response"]["leak_cfm_change"] != None:
+    # if scenario_differences_json["response"]["leak_cfm_change"] != 0 or scenario_differences_json["response"]["leak_cfm_change"] != None:
+    #     leak_cfm_change = scenario_differences_json["response"]["leak_cfm_change"]
+    #     cfm_changes.append(leak_cfm_change)
+    
+    try:
         leak_cfm_change = scenario_differences_json["response"]["leak_cfm_change"]
         cfm_changes.append(leak_cfm_change)
+    except:
+        print(f"No leak_cfm_change")
     
-    if scenario_differences_json["response"]["drain_cfm_change"] != 0 or scenario_differences_json["response"]["drain_cfm_change"] != None:
+    # if scenario_differences_json["response"]["drain_cfm_change"] != 0 or scenario_differences_json["response"]["drain_cfm_change"] != None:
+    #     drain_cfm_change = scenario_differences_json["response"]["drain_cfm_change"]
+    #     cfm_changes.append(drain_cfm_change)
+    
+    # if scenario_differences_json["response"]["dryer_cfm_change"] != 0 or scenario_differences_json["response"]["dryer_cfm_change"] != None:
+    #     dryer_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
+    #     cfm_changes.append(dryer_cfm_change)
+    
+    try:
         drain_cfm_change = scenario_differences_json["response"]["drain_cfm_change"]
         cfm_changes.append(drain_cfm_change)
-    
-    if scenario_differences_json["response"]["dryer_cfm_change"] != 0 or scenario_differences_json["response"]["dryer_cfm_change"] != None:
+    except:
+        print(f"No drain_cfm_change")
+
+    try:
         dryer_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
         cfm_changes.append(dryer_cfm_change)
+    except:
+        print(f"No dryer_cfm_change")
 
     total_cfm_changes = sum(cfm_changes)
 
@@ -83,14 +101,26 @@ def update_op_stats(op_id, report_id, dev):
 
 
     kw_changes = []
-    if scenario_differences_json["response"]["dryer_kw_change"] != 0 or scenario_differences_json["response"]["dryer_kw_change"] != None:
+    # if scenario_differences_json["response"]["dryer_kw_change"] != 0 or scenario_differences_json["response"]["dryer_kw_change"] != None:
+    #     dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
+    #     kw_changes.append(dryer_kw_change)
+    
+    # if scenario_differences_json["response"]["compressor_kw_change"] != 0 or scenario_differences_json["response"]["compressor_kw_change"] != None:
+    #     compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
+    #     kw_changes.append(compressor_kw_change)
+    
+    try:
         dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
         kw_changes.append(dryer_kw_change)
+    except:
+        print(f"No dryer_kw_change")
     
-    if scenario_differences_json["response"]["compressor_kw_change"] != 0 or scenario_differences_json["response"]["compressor_kw_change"] != None:
+    try:
         compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
         kw_changes.append(compressor_kw_change)
-    
+    except:
+        print(f"No compressor_kw_change")
+
     total_kw_changes = sum(kw_changes)
 
     orig_kw = get_real_op_avg_kw(report_id, op_name, dev)
@@ -99,9 +129,14 @@ def update_op_stats(op_id, report_id, dev):
 
 
     psi_changes = []
-    if scenario_differences_json["response"]["filter_psi_change"] != 0 or scenario_differences_json["response"]["filter_psi_change"] != None:
+    # if scenario_differences_json["response"]["filter_psi_change"] != 0 or scenario_differences_json["response"]["filter_psi_change"] != None:
+    #     filter_psi_change = scenario_differences_json["response"]["filter_psi_change"]
+    #     psi_changes.append(filter_psi_change)
+    try:
         filter_psi_change = scenario_differences_json["response"]["filter_psi_change"]
         psi_changes.append(filter_psi_change)
+    except:
+        print(f"No filter_psi_change")
     
     total_psi_changes = sum(psi_changes)
 

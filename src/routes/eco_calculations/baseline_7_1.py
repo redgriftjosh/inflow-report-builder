@@ -176,9 +176,23 @@ def get_peak_15_acfm(op_json, dev):
     scenario_differences_id = op_json["response"]["scenario_differences"]
     scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
     
-    drain_cfm_change = scenario_differences_json["response"]["drain_cfm_change"]
-    dryer_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
-    leak_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
+    try:
+        leak_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
+    except:
+        leak_cfm_change = 0
+        print("no pleak_cfm_change")
+    
+    try:
+        drain_cfm_change = scenario_differences_json["response"]["drain_cfm_change"]
+    except:
+        drain_cfm_change = 0
+        print("no pleak_cfm_change")
+    
+    try:
+        dryer_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
+    except:
+        dryer_cfm_change = 0
+        print("no pleak_cfm_change")
 
     cfm_change = drain_cfm_change + dryer_cfm_change + leak_cfm_change
 
@@ -192,8 +206,15 @@ def get_kw_demand_15min(report_json, op_json, dev):
     scenario_differences_id = op_json["response"]["scenario_differences"]
     scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
     
-    compressor_kw_change = scenario_differences_json["response"]["drain_cfm_change"]
-    dryer_kw_change = scenario_differences_json["response"]["dryer_cfm_change"]
+    try:
+        compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
+    except:
+        compressor_kw_change = 0
+
+    try:
+        dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
+    except:
+        dryer_kw_change = 0
 
     kw_change = compressor_kw_change + dryer_kw_change
 
@@ -308,10 +329,16 @@ def calculate_dryer(report_json, scenario_id, operation_period_ids, baseline_ope
         scenario_differences_id = op_json["response"]["scenario_differences"]
         scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
 
-        dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
-        dryer_kw_changes.append(dryer_kw_change)
+        try:
+            dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
+            dryer_kw_changes.append(dryer_kw_change)
+        except:
+            print("no dryer_kw_change")
     
-    avg_dryer_kw_change = sum(dryer_kw_changes)/len(dryer_kw_changes)
+    try:
+        avg_dryer_kw_change = sum(dryer_kw_changes)/len(dryer_kw_changes)
+    except:
+        avg_dryer_kw_change = 0
 
     report_dryer_kw = get_report_dryer_kw(report_json, dev)
 

@@ -548,7 +548,10 @@ def get_max_cfm(ac_id, dev):
         return cfm
 
 
-def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, gal_per_cfm, dev):
+def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, kw_per_cfm, is_new, gal_per_cfm, dev):
+    if is_new != True:
+        return acfm * kw_per_cfm
+
     ac_json = get_req("air_compressor", ac_id, dev)
     control = ac_json["response"]["Control Type"]
     ac_name = ac_json["response"]["Customer CA"]
