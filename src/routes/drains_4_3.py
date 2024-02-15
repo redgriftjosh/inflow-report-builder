@@ -30,24 +30,24 @@ def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
     try:
         off_min = drain_json["response"]["baseline_off_min"]
         on_sec = drain_json["response"]["baseline_on_sec"]
+
+        try:
+            acfm_loss = drain_json["response"]["acfm_loss"]
+        except:
+            acfm_loss = 0
+        
+        cycles_per_hour = 0 if off_min < 0.1 else 60 / off_min
+
+        cf_per_cycle = on_sec * (52 / 60) # Currently hard coding 52 CFM can get through the drain
+
+        total_acfm_loss = acfm_loss + (cycles_per_hour * cf_per_cycle / 60)
+
+
+        return total_acfm_loss + kw_max_avg_15 / peak_acfm_15_min
     except:
-        off_min = 0
-        on_sec = 0
+        return 0
 
 
-    try:
-        acfm_loss = drain_json["response"]["acfm_loss"]
-    except:
-        acfm_loss = 0
-    
-    cycles_per_hour = 60 / off_min if off_min > 0.1 else 0
-
-    cf_per_cycle = on_sec * (52 / 60) # Currently hard coding 52 CFM can get through the drain
-
-    total_acfm_loss = acfm_loss + (cycles_per_hour * cf_per_cycle / 60)
-
-
-    return total_acfm_loss + kw_max_avg_15 / peak_acfm_15_min
 
 def get_global_values(report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
@@ -149,9 +149,15 @@ def start():
         kwh_annual = kw_per_year * hours_annual
         print(f"kwh_annual: {kwh_annual}")
 
-        cost_to_operate = get_cost_to_operate(report_json, kw_max_avg_15, kwh_annual, demand_schedule_id="no demand schedules", op_id="no", dev=dev)
-        print(f"cost_to_operate: {cost_to_operate}")
-        common_functions.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
+        if kwh_annual != 0:
+            cost_to_operate = get_cost_to_operate(report_json, kw_max_avg_15, kwh_annual, demand_schedule_id="no demand schedules", op_id="no", dev=dev)
+            print(f"cost_to_operate: {cost_to_operate}")
+            common_functions.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
+        else:
+            cost_to_operate = 0
+            print(f"cost_to_operate: {cost_to_operate}")
+            common_functions.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
+
     
 
 start()
