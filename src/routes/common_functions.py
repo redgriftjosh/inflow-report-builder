@@ -548,9 +548,16 @@ def get_max_cfm(ac_id, dev):
         return cfm
 
 
-def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, kw_per_cfm, is_new, gal_per_cfm, dev):
+def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, dev):
+    
+    try:
+        pressure_correct = pressure + pressure_change
+        psi_percent = pressure_correct / pressure
+    except:
+        psi_percent = 1
+
     if is_new != True:
-        return acfm * kw_per_cfm
+        return (acfm * kw_per_cfm) * psi_percent
 
     ac_json = get_req("air_compressor", ac_id, dev)
     control = ac_json["response"]["Control Type"]
@@ -593,7 +600,7 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, acfm, kw_per_cfm, is_new,
         print(f"gal_per_cfm: {gal_per_cfm}")
         print(f"percent_kw: {percent_kw}")
 
-        return kw_at_full_load * percent_kw
+        return (kw_at_full_load * percent_kw) * psi_percent
         
     elif control == "Fixed Speed - Inlet Modulation":
         pf = ac_json["response"]["pf"]

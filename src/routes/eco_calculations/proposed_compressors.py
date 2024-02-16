@@ -181,6 +181,16 @@ def get_op_report_ac_kw(report_id, op_name, dev):
             kw = op_json["response"]["kW"]
             return kw
 
+def get_pressure_change(op_json, dev):
+    try:
+        scenario_difference_id = op_json["response"]["scenario_differences"]
+        scenario_difference_json = common_functions.get_req("scenario_differences", scenario_difference_id, dev)
+
+        filter_psi_change = scenario_difference_json["response"]["filter_psi_change"]
+
+        return filter_psi_change
+    except:
+        return 0
 
 def start():
     print(f"getting started proposed_compressors.py")
@@ -202,6 +212,8 @@ def start():
 
         pressure = get_pressure_index(report_id, op_json, dev)
 
+        pressure_change = get_pressure_change(op_json, dev)
+
         gal_per_cfm = common_functions.get_gal_per_cfm(ac_ids, report_id, dev)
 
         for ac in ac_ids:
@@ -219,7 +231,7 @@ def start():
 
             acfm = get_acfm_entered(op_json, ac, dev)
 
-            avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, acfm, kw_per_cfm, is_new, gal_per_cfm, dev)
+            avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, dev)
             avg_kws.append(avg_kw)
         
         op_avg_kw = sum(avg_kws)
