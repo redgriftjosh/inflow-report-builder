@@ -3,6 +3,7 @@ import sys
 import json
 import baseline_global
 import pandas as pd
+import numpy as np
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -222,7 +223,12 @@ def get_cfm_df(report_json, ac_ids, dev):
     return master_df
 
 def calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm):
-    return full_load_kw * (acfm / capacity_scfm)
+    x = [(capacity_scfm*0.1), capacity_scfm]
+    y = [(full_load_kw*0.55), full_load_kw]
+
+    slope, intercept = np.polyfit(x, y, 1)
+
+    return slope * acfm + intercept
 
 def get_total_baseline_dryer_kw(report_id, scenario_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
