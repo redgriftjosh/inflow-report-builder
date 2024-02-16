@@ -52,17 +52,24 @@ def get_total_report_drain_cfm(report_id, dev):
     for drain_id in drain_ids:
         drain_json = common_functions.get_req("drain", drain_id, dev)
 
+        try:
+            off_min = drain_json["response"]["baseline_off_min"]
+            on_sec = drain_json["response"]["baseline_on_sec"]
+        except:
+            off_min = 0
+            on_sec = 0
+        
+
         if off_min == 0 or on_sec == 0:
             try:
                 adjusted_cfm = drain_json["response"]["acfm_loss"]
+                
             except:
                 adjusted_cfm = 0
+
         else:
 
             try:
-                off_min = drain_json["response"]["baseline_off_min"]
-                on_sec = drain_json["response"]["baseline_on_sec"]
-                
                 cycles_per_hour = 0 if off_min < 0.1 else 60 / off_min
 
                 cf_per_cycle = on_sec * (52 / 60) # Currently hard coding 52 CFM can get through the drain
