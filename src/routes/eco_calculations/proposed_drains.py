@@ -101,7 +101,39 @@ def get_total_proposed_drain_cfm(scenario_id, dev):
     adjusted_cfms = []
     for drain_id in drain_ids:
         drain_json = common_functions.get_req("drain", drain_id, dev)
-        adjusted_cfm = drain_json["response"]["acfm_loss"]
+
+        try:
+            off_min = drain_json["response"]["baseline_off_min"]
+            on_sec = drain_json["response"]["baseline_on_sec"]
+        except:
+            off_min = 0
+            on_sec = 0
+        
+
+        if off_min == 0 or on_sec == 0:
+            try:
+                adjusted_cfm = drain_json["response"]["acfm_loss"]
+                
+            except:
+                adjusted_cfm = 0
+
+        else:
+
+            try:
+                cycles_per_hour = 0 if off_min < 0.1 else 60 / off_min
+
+                cf_per_cycle = on_sec * (52 / 60) # Currently hard coding 52 CFM can get through the drain
+
+                try:
+                    acfm_loss = drain_json["response"]["acfm_loss"]
+                except:
+                    acfm_loss = 0
+
+                adjusted_cfm = acfm_loss + (cycles_per_hour * cf_per_cycle / 60)
+
+            except:
+                adjusted_cfm = 0
+        
 
         adjusted_cfms.append(adjusted_cfm)
     
