@@ -552,7 +552,7 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw
     
     try:
         pressure_correct = pressure + pressure_change
-        psi_percent = pressure_correct / pressure
+        psi_percent = 1-((pressure-pressure_correct)*0.005)
     except:
         psi_percent = 1
 
