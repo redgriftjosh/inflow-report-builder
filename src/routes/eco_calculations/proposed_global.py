@@ -39,6 +39,18 @@ def get_real_op_avg_acfm(report_id, op_name, dev):
             acfm = operating_period_json["response"]["ACFM Made"]
             return acfm
 
+def get_real_op_peak_acfm(report_id, op_name, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+    # avg_acfm = report_json["response"]["avg_acfm"]
+
+    operation_period_ids = report_json["response"]["operation_period"]
+
+    for operating_period_id in operation_period_ids:
+        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        if operating_period_json["response"]["Name"] == op_name:
+            acfm = operating_period_json["response"]["peak_15min_acfm"]
+            return acfm
+
 def get_real_op_avg_kw(report_id, op_name, dev):
     report_json = common_functions.get_req("report", report_id, dev)
     # avg_acfm = report_json["response"]["avg_acfm"]
@@ -79,25 +91,22 @@ def update_op_stats(op_id, report_id, dev):
     except:
         print(f"No dryer_cfm_change")
 
-    # if scenario_differences_json["response"]["leak_cfm_change"] != 0 or scenario_differences_json["response"]["leak_cfm_change"] != None:
-    #     leak_cfm_change = scenario_differences_json["response"]["leak_cfm_change"]
-    #     cfm_changes.append(leak_cfm_change)
-    
-    # if scenario_differences_json["response"]["drain_cfm_change"] != 0 or scenario_differences_json["response"]["drain_cfm_change"] != None:
-    #     drain_cfm_change = scenario_differences_json["response"]["drain_cfm_change"]
-    #     cfm_changes.append(drain_cfm_change)
-    
-    # if scenario_differences_json["response"]["dryer_cfm_change"] != 0 or scenario_differences_json["response"]["dryer_cfm_change"] != None:
-    #     dryer_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
-    #     cfm_changes.append(dryer_cfm_change)
-
     total_cfm_changes = sum(cfm_changes)
 
     op_name = op_json["response"]["Name"]
 
     orig_acfm = get_real_op_avg_acfm(report_id, op_name, dev)
 
+    orig_peak_acfm = get_real_op_peak_acfm(report_id, op_name, dev)
+
     new_acfm = orig_acfm + total_cfm_changes
+
+    new_peak_acfm = orig_peak_acfm + total_cfm_changes
+
+    print(f"orig_acfm: {orig_acfm}")
+    print(f"orig_peak_acfm: {orig_peak_acfm}")
+    print(f"new_acfm: {new_acfm}")
+    print(f"new_peak_acfm: {new_peak_acfm}")
 
 
     kw_changes = []
@@ -113,14 +122,6 @@ def update_op_stats(op_id, report_id, dev):
     except:
         print(f"No compressor_kw_change")
     
-    # if scenario_differences_json["response"]["dryer_kw_change"] != 0 or scenario_differences_json["response"]["dryer_kw_change"] != None:
-    #     dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
-    #     kw_changes.append(dryer_kw_change)
-    
-    # if scenario_differences_json["response"]["compressor_kw_change"] != 0 or scenario_differences_json["response"]["compressor_kw_change"] != None:
-    #     compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
-    #     kw_changes.append(compressor_kw_change)
-    
     total_kw_changes = sum(kw_changes)
 
     orig_kw = get_real_op_avg_kw(report_id, op_name, dev)
@@ -135,9 +136,6 @@ def update_op_stats(op_id, report_id, dev):
     except:
         print(f"No filter_psi_change")
     
-    # if scenario_differences_json["response"]["filter_psi_change"] != 0 or scenario_differences_json["response"]["filter_psi_change"] != None:
-    #     filter_psi_change = scenario_differences_json["response"]["filter_psi_change"]
-    #     psi_changes.append(filter_psi_change)
     
     total_psi_changes = sum(psi_changes)
 
@@ -147,7 +145,7 @@ def update_op_stats(op_id, report_id, dev):
 
     pressure_list[i] = new_psi
 
-    common_functions.patch_req("operation_period", op_id, body={"P2": pressure_list, "kW": new_kw, "ACFM Made": new_acfm}, dev=dev)
+    common_functions.patch_req("operation_period", op_id, body={"P2": pressure_list, "kW": new_kw, "ACFM Made": new_acfm, "peak_15min_acfm": new_peak_acfm}, dev=dev)
 
     scenario_differences = op_json["response"]["scenario_differences"]
 

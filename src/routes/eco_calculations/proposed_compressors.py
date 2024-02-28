@@ -79,54 +79,8 @@ def check_is_new(ac_id, dev):
     
     return False
 
-# This isn't finished but keeping this code incase Peter Wants to go this route
-def old_check_is_new(s_ac_id, s_ac_name, report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
-    r_ac_ids = report_json["response"]["air_compressor"]
-    
-    for ac_id in r_ac_ids:
-        ac_json = common_functions.get_req("air_compressor", ac_id, dev)
-        r_ac_name = ac_json["response"]["Customer CA"]
-
-        if r_ac_name == s_ac_name:
-            r_ac_id = ac_id
-            r_ac_json = ac_json
-            break
-        
-        print("cant find compressor with the same name (Customer CA) so yeah, gonna guess this is a new compressor")
-        return True
-
-    s_ac_json = common_functions.get_req("air_compressor", s_ac_id, dev)
-
-    if r_ac_json["response"].get("Make") != s_ac_json["response"].get("Make"):
-        print(f"Key: 'Make' doesnt match. This is New Compressor")
-        return True
-
-    if r_ac_json["response"].get("Model") != s_ac_json["response"].get("Model"):
-        print(f"Key: 'Model' doesnt match. This is New Compressor")
-        return True
-    
-    if r_ac_json["response"].get("Control Type") != s_ac_json["response"].get("Control Type"):
-        print(f"Key: 'Control Type' doesnt match. This is New Compressor")
-        return True
-
-    if r_ac_json["response"].get("Year of Machine") != s_ac_json["response"].get("Year of Machine"):
-        print(f"Key: 'Year of Machine' doesnt match. This is New Compressor")
-        return True
-    
-    if r_ac_json["response"].get("machine_hours") != s_ac_json["response"].get("machine_hours"):
-        print(f"Key: 'machine_hours' doesnt match. This is New Compressor")
-        return True
-    
-    if r_ac_json["response"].get("Model") != s_ac_json["response"].get("Model"):
-        print(f"Key: 'Model' doesnt match. This is New Compressor")
-        return True
-    
-    return False
-
-
 # Gets the corrosponding kw & acfm that was calculated in the report for this opration_periods compressor (Needs to be from section 7.2)
-# s_ for scenario & r_ for report to differentiate between tthe two variables
+# s_ for scenario & r_ for report to differentiate between the two variables
 def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
     s_op_name = s_op_json["response"]["Name"]
 
@@ -156,6 +110,33 @@ def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
                     return r_kw / r_acfm
 
 
+def get_peak_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
+    s_op_name = s_op_json["response"]["Name"]
+
+    report_json = common_functions.get_req("report", report_id, dev)
+    r_op_ids = report_json["response"]["operation_period"]
+
+    # Go through all the operating periods in the report and find the one that matches the name we want
+    for r_op_id in r_op_ids:
+        r_op_json = common_functions.get_req("operation_period", r_op_id, dev)
+        r_op_name = r_op_json["response"]["Name"]
+
+        if r_op_name == s_op_name:
+            r_dataset_ids = r_op_json["response"]["dataset_7_2"]
+
+            # Go through all the datasets in the report section 7.2 and find the one that matches the Air Compressor we want
+            for r_dataset_id in r_dataset_ids:
+                r_dataset_json = common_functions.get_req("dataset_7_2", r_dataset_id, dev)
+                r_ac_id = r_dataset_json["response"]["air_compressor"]
+                r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
+                r_ac_name = r_ac_json["response"]["Customer CA"]
+
+                if r_ac_name == s_ac_name:
+                    r_kw = r_dataset_json["response"]["peak-15-kw"]
+                    r_acfm = r_dataset_json["response"]["peak-15-acfm"]
+
+                    # Calculate and return kw/cfm should be like a decimal aroun 0.3
+                    return r_kw / r_acfm
 
 def get_acfm_entered(op_json, ac_id, dev):
     dataset_7_2_ids = op_json["response"]["dataset_7_2"]
@@ -167,6 +148,17 @@ def get_acfm_entered(op_json, ac_id, dev):
         if row_ac_id == ac_id:
             acfm = dataset_7_2_json["response"]["acfm"]
             return acfm
+
+def get_peak_acfm_entered(op_json, ac_id, dev):
+    dataset_7_2_ids = op_json["response"]["dataset_7_2"]
+
+    for dataset_7_2_id in dataset_7_2_ids:
+        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        row_ac_id = dataset_7_2_json["response"]["air_compressor"]
+
+        if row_ac_id == ac_id:
+            peak_acfm = dataset_7_2_json["response"]["peak-15-acfm"]
+            return peak_acfm
 
 def get_op_report_ac_kw(report_id, op_name, dev):
     report_json = common_functions.get_req("report", report_id, dev)
@@ -180,6 +172,29 @@ def get_op_report_ac_kw(report_id, op_name, dev):
         if op_json["response"]["Name"] == op_name:
             kw = op_json["response"]["kW"]
             return kw
+
+# Finds the right Operating Schedule then returns a sum of all peak-15-kws in table 7.2 On REPORT NOT SCENARIO
+def get_op_report_max_ac_kw(report_id, op_name, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+
+    op_ids = report_json["response"]["operation_period"]
+
+    kw = []
+    for op_id in op_ids:
+        op_json = common_functions.get_req("operation_period", op_id, dev)
+
+        if op_json["response"]["Name"] == op_name:
+            dataset_7_2_ids = op_json["response"]["dataset_7_2"]
+
+            max_kws = []
+            for dataset_7_2 in dataset_7_2_ids:
+                dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2, dev)
+                
+                max_kw = dataset_7_2_json["response"]["peak-15-kw"]
+                max_kws.append(max_kw)
+            
+            return sum(max_kws)
+
 
 def get_pressure_change(op_json, dev):
     try:
@@ -207,6 +222,7 @@ def start():
 
     for operating_period_id in operating_period_ids:
         avg_kws = []
+        max_kws = []
         
         op_json = common_functions.get_req("operation_period", operating_period_id, dev)
 
@@ -225,22 +241,40 @@ def start():
 
             if is_new == True:
                 kw_per_cfm = None
+                peak_kw_per_cfm = None
             else:
                 # Get kw/cfm kpi so we can calculate the new kW if it's the same compressor
                 kw_per_cfm = get_kw_per_cfm(report_id, ac_name, op_json, dev)
+                peak_kw_per_cfm = get_peak_kw_per_cfm(report_id, ac_name, op_json, dev)
 
             acfm = get_acfm_entered(op_json, ac, dev)
-
-            avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, dev)
+            peak_acfm = get_peak_acfm_entered(op_json, ac, dev)
+            
+            # Using average ACFM
+            avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, is_peak=False, dev=dev)
             avg_kws.append(avg_kw)
+
+            # Using peak ACFM
+            max_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, peak_acfm, peak_kw_per_cfm, is_new, gal_per_cfm, is_peak=True, dev=dev)
+            max_kws.append(max_kw)
         
+        # New Calculated Values
         op_avg_kw = sum(avg_kws)
+        op_max_kw = sum(max_kws)
 
         op_name = op_json["response"]["Name"]
 
+        # Report / Original Values
         report_op_kw = get_op_report_ac_kw(report_id, op_name, dev)
+        report_op_max_kw = get_op_report_max_ac_kw(report_id, op_name, dev)
 
-        total_kw_change = op_avg_kw - report_op_kw
+        # Calculate difference
+        avg_kw_change = op_avg_kw - report_op_kw
+        peak_kw_change = op_max_kw - report_op_max_kw
+
+        print("")
+        print(f"avg_kw_change: {avg_kw_change}")
+        print(f"peak_kw_change: {peak_kw_change}")
 
         operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
         try:
@@ -248,7 +282,7 @@ def start():
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": total_kw_change}, dev=dev)
+        common_functions.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": avg_kw_change, "compressor_peak_kw_change": peak_kw_change}, dev=dev)
 
         proposed_global.update_op_stats(operating_period_id, report_id, dev)
 

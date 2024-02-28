@@ -5,81 +5,91 @@ import common_functions
 import reset_dataset_7_2
 import pandas as pd
 
-def check_datasets(report_id, report_json, dev):
-    if "air_compressor" in report_json["response"]:
-        ac_ids = report_json["response"]["air_compressor"]
-        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(ac_ids)} Air Compressor{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
-    else:
-        common_functions.patch_req("Report", report_id, body={"loading": "No Air Compressors Found! You need at least one Air Compressor.", "is_loading_error": "yes"}, dev=dev)
-        sys.exit()
+# def check_datasets(report_id, report_json, dev):
+#     if "air_compressor" in report_json["response"]:
+#         ac_ids = report_json["response"]["air_compressor"]
+#         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(ac_ids)} Air Compressor{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+#     else:
+#         common_functions.patch_req("Report", report_id, body={"loading": "No Air Compressors Found! You need at least one Air Compressor.", "is_loading_error": "yes"}, dev=dev)
+#         sys.exit()
 
-    if "operation_period" in report_json["response"]:
-        op_per_type = report_json["response"]["operating_period_type"]
+#     if "operation_period" in report_json["response"]:
+#         op_per_type = report_json["response"]["operating_period_type"]
         
-        operating_period_ids = report_json["response"]["operation_period"]
-        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
-    else:
-        common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
-        sys.exit()
+#         operating_period_ids = report_json["response"]["operation_period"]
+#         common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+#     else:
+#         common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
+#         sys.exit()
 
 
-    for ac in ac_ids:
-        # Get the Air Compressor into a DataFrame
-        ac_json = common_functions.get_req("air_compressor", ac, dev)
-        if "ac_data_logger" in ac_json["response"]:
-            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
-        else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing data loggers! Make sure each Air Compressor has a Properly Formatted CSV uploaded. Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
-            sys.exit()
+#     for idx, ac in enumerate(ac_ids):
+#         # Get the Air Compressor into a DataFrame
+#         ac_json = common_functions.get_req("air_compressor", ac, dev)
+#         if "Customer CA" in ac_json["response"]:
+#             ac_name = ac_json["response"]["Customer CA"]
+#         else:
+#             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+#             sys.exit()
 
-        ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+#         ac_json = common_functions.get_req("air_compressor", ac, dev)
+#         if "ac_data_logger" in ac_json["response"]:
+#             ac_data_logger_id = ac_json["response"]["ac_data_logger"]
+#         else:
+#             common_functions.patch_req("Report", report_id, body={"loading": f"Missing data loggers! Make sure each Air Compressor has a Properly Formatted CSV uploaded. Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+#             sys.exit()
 
-        csv_url = ac_data_logger_json["response"]["CSV"]
-        csv_url = f"https:{csv_url}"
+#         ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
 
-        df = common_functions.csv_to_df(csv_url)
+#         csv_url = ac_data_logger_json["response"]["CSV"]
+#         csv_url = f"https:{csv_url}"
 
-        # Trim & Exclude specified data
-        if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
-            df = common_functions.trim_df(report_json, df)
+#         df = common_functions.csv_to_df(csv_url)
 
-        if "exclusion" in report_json["response"]:
-            df = common_functions.exclude_from_df(df, report_json, dev)
+#         # Trim & Exclude specified data
+#         if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+#             df = common_functions.trim_df(report_json, df)
+
+#         if "exclusion" in report_json["response"]:
+#             df = common_functions.exclude_from_df(df, report_json, dev)
         
-        # Create Kilowatts column
-        volts = ac_json["response"]["volts"]
-        pf50 = ac_json["response"]["pf if fifty"]
-        pf = ac_json["response"]["pf"]
-        amppf = ac_json["response"]["amps less pf"]
-        bhp = ac_json["response"]["BHP"]
+#         # Create Kilowatts column
+#         volts = ac_json["response"]["volts"]
+#         pf50 = ac_json["response"]["pf if fifty"]
+#         pf = ac_json["response"]["pf"]
+#         amppf = ac_json["response"]["amps less pf"]
+#         bhp = ac_json["response"]["BHP"]
         
-        df["Kilowatts"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
+#         df["Kilowatts"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
+
+#         control = ac_json["response"]["Control Type"]
+#         cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+
+#         df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
     
-        # Create ACFM Column
-        control = ac_json["response"]["Control Type"]
-        cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-        if control == "OLOL":
-            threshold = ac_json["response"]["threshold-value"]
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
-        elif control == "VFD":
-            slope, intercept = common_functions.calculate_slope_intercept(ac_json, cfm, volts, dev)
-            df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
+#         # Create ACFM Column
+#         # if control == "OLOL":
+#         #     threshold = ac_json["response"]["threshold-value"]
+#         #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_olol_acfm(amps, threshold, cfm))
+#         # elif control == "VFD":
+#         #     slope, intercept = common_functions.calculate_slope_intercept(ac_json, cfm, volts, dev)
+#         #     df["ACFM"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_vfd_acfm(amps, slope, intercept))
 
-        if op_per_type == "Daily":
+#         if op_per_type == "Daily":
 
-            for operating_period_id in operating_period_ids:
-                period_data = common_functions.daily_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
+#             for operating_period_id in operating_period_ids:
+#                 period_data = common_functions.daily_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
 
-                dataset_7_2_calculations(period_data, operating_period_id, ac, cfm, dev)
+#                 dataset_7_2_calculations(period_data, idx, operating_period_id, ac, cfm, dev)
 
-        elif op_per_type == "Weekly":
+#         elif op_per_type == "Weekly":
 
-            for operating_period_id in operating_period_ids:
+#             for operating_period_id in operating_period_ids:
                 
-                # get the average kw for this operating period
-                period_data = common_functions.weekly_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
+#                 # get the average kw for this operating period
+#                 period_data = common_functions.weekly_operating_period(df, operating_period_id, dev) # Filter dataframe to operating period
 
-                dataset_7_2_calculations(period_data, operating_period_id, ac, cfm, dev)
+#                 dataset_7_2_calculations(period_data, idx, operating_period_id, ac, cfm, dev)
 
 def start():
     data = json.loads(sys.argv[1]) # Proper Code. Keep this
@@ -105,7 +115,7 @@ def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, a
         common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Populating {op_name}...", "is_loading_error": "no"}, dev=dev)
     
     # For entire Operating Period
-    avg_kilowatts = period_data["Kilowatts"].mean() # get the average kw for this operating period
+    avg_kilowatts = period_data[f"Kilowatts{idx+1}"].mean() # get the average kw for this operating period
     print(f"avg_kilowatts: {avg_kilowatts}")
 
 
@@ -114,12 +124,12 @@ def dataset_7_2_calculations(idx, report_id, period_data, operating_period_id, a
     flow_percent = (acfm/cfm) * 100
 
     # For 15 min peaks
-    peak_15_kw = period_data["Kilowatts"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+    peak_15_kw = period_data[f"Kilowatts{idx+1}"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
     peak_15_acfm = period_data[f"ACFM{idx+1}"][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
     peak_15_flow_percent = (peak_15_acfm/cfm) * 100
 
     # For 2 min peaks
-    peak_2_kw = period_data["Kilowatts"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+    peak_2_kw = period_data[f"Kilowatts{idx+1}"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
     peak_2_acfm = period_data[f"ACFM{idx+1}"][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
     peak_2_flow_percent = (peak_2_acfm/cfm) * 100
 
@@ -231,7 +241,7 @@ def get_average_kw(report_id, report_json, dev):
             sys.exit()
         
         
-        df["Kilowatts"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
+        df[f"Kilowatts{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
 
         common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
         # Create ACFM Column

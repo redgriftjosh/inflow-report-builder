@@ -5,6 +5,136 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+def df_calcs(report_json, dev):
+    report_id = report_json["response"]["_id"]
+    if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
+        ac_ids = report_json["response"]["air_compressor"]
+        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(ac_ids)} Air Compressor{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+    else:
+        common_functions.patch_req("Report", report_id, body={"loading": "No Air Compressors Found! You need at least one Air Compressor.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+    if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
+        op_per_type = report_json["response"]["operating_period_type"]
+        
+        operating_period_ids = report_json["response"]["operation_period"]
+        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+    else:
+        common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
+        sys.exit()
+
+    # For combining all the air compressors
+    master_df = None
+
+    for idx, ac in enumerate(ac_ids):
+        common_functions.patch_req("Report", report_id, body={"loading": f"Starting on Air Compressor {idx + 1}...", "is_loading_error": "no"}, dev=dev)
+        
+        
+        # Get the Air Compressor into a DataFrame
+        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        if "ac_data_logger" in ac_json["response"]:
+            ac_data_logger_id = ac_json["response"]["ac_data_logger"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing data loggers! Make sure each Air Compressor has a Properly Formatted CSV uploaded. Air Compressor: {ac}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+
+        ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+        
+        if "Customer CA" in ac_json["response"]:
+            ac_name = ac_json["response"]["Customer CA"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+
+        common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
+        csv_url = ac_data_logger_json["response"]["CSV"]
+        csv_url = f"https:{csv_url}"
+
+        df = common_functions.csv_to_df(csv_url)
+
+        # Trim & Exclude specified data
+        if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+            df = common_functions.trim_df(report_json, df, dev)
+            common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Trimming CSV...", "is_loading_error": "no"}, dev=dev)
+
+        if "exclusion" in report_json["response"]:
+            df = common_functions.exclude_from_df(df, report_json, dev)
+            common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Excluding from CSV...", "is_loading_error": "no"}, dev=dev)
+        
+        common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: Kilowatts Column...", "is_loading_error": "no"}, dev=dev)
+        # Create Kilowatts column
+        
+        if "volts" in ac_json["response"]:
+            volts = ac_json["response"]["volts"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "pf if fifty" in ac_json["response"]:
+            pf50 = ac_json["response"]["pf if fifty"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "pf" in ac_json["response"]:
+            pf = ac_json["response"]["pf"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "amps less pf" in ac_json["response"]:
+            amppf = ac_json["response"]["amps less pf"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        if "BHP" in ac_json["response"]:
+            bhp = ac_json["response"]["BHP"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+        
+        
+        df["Kilowatts"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
+
+        common_functions.patch_req("Report", report_id, body={"loading": f"Air Compressor {idx + 1}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
+        # Create ACFM Column
+
+        if "Control Type" in ac_json["response"]:
+            control = ac_json["response"]["Control Type"]
+        else:
+            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            sys.exit()
+
+        if control == "Fixed Speed - Variable Capacity":
+            cfm = 1
+        else:
+            if "CFM" in ac_json["response"]:
+                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+            else:
+                common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+                sys.exit()
+        
+
+        print(f"calculating flow for {ac_name}")
+        df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
+        print(f"calculated flow for {ac_name}")
+
+        current_name_date = df.columns[1]
+        current_name_num = df.columns[0]
+        current_name_amps = df.columns[2]
+        df.rename(columns={current_name_date: f"Date{idx+1}", current_name_num: f"Num{idx+1}", current_name_amps: f"Amps{idx+1}"}, inplace=True)
+        
+        if master_df is None:
+            master_df = df
+            print("added first DataFrame to master_df")
+        else:
+            master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
+            print("Merged next Dataframe with master_df")
+
+    return master_df
+
+
 # Make sure we have everything we need before running
 def check_dependencies(report_id, report_json, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Checking Dependencies...", "is_loading_error": "no"}, dev=dev)
@@ -16,14 +146,17 @@ def check_dependencies(report_id, report_json, dev):
         print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
         sys.exit(1)
 
+
     # Checking if we have the necessary data from section 3.2
-    try:
-        peak_acfm_15 = report_json["response"]["15 Min Peak Flow"]
-        kw_max_avg_15 = report_json["response"]["kw_max_avg_15"]
-    except:
-        print(f"You'll need to run Section 3.2 before you run this one...", file=sys.stderr)
-        sys.exit(1)
+    # try:
+    #     peak_acfm_15 = report_json["response"]["15 Min Peak Flow"]
+    #     # kw_max_avg_15 = report_json["response"]["kw_max_avg_15"] # Should only get for demand schedule not entire report
+    # except:
+    #     print(f"You'll need to run Section 3.2 before you run this one...", file=sys.stderr)
+    #     sys.exit(1)
     
+
+
     # Checking if we have electrical utility providers entered
     try:
         electrical_provider = report_json["response"]["electrical_provider"]
@@ -42,13 +175,19 @@ def check_dependencies(report_id, report_json, dev):
     baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1, dev)
 
     demand_schedule_id = baseline_operation_7_1_json["response"]["demand_schedule_id"]
+
+    # try:
+    #     kw_max_avg_15 = df_calcs(report_id, report_json, demand_schedule_id, dev)
+    # except:
+    #     print(f"Something Went wrong getting 15 min kw for this operating period...", file=sys.stderr)
+    #     sys.exit(1)
     # try:
     # except Exception as e:
     #     print(f"Please Select an Operation Period to define the Demand calculations...{e}", file=sys.stderr)
     #     sys.exit(1)
 
     
-    return on_peak_start, off_peak_start, operation_period_ids, demand_schedule_id, kw_max_avg_15
+    return on_peak_start, off_peak_start, operation_period_ids, demand_schedule_id
     
 
 def create_first_baseline_operation_7_1(report_id, dev):
@@ -164,19 +303,39 @@ def get_pressure_index(report_id, op_json, dev):
         common_functions.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
         print(f"Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like: P4", file=sys.stderr)
         sys.exit(1)
+
+def filter_df(df, report_json, op_id, dev):
+    op_per_type = report_json["response"]["operating_period_type"]
+
+    if op_per_type == "Daily":
+        
+        return common_functions.daily_operating_period(df, op_id, dev) # Filter dataframe to operating period
+
+    elif op_per_type == "Weekly":
+
+        return common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
+        
+    elif op_per_type == "Experimental":
+
+        return common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
+
+def calculate_row(report_json, demand_schedule_id, op_id, op_json, baseline_operation_7_1, df, dev):
+
+    period_data = filter_df(df, report_json, op_id, dev)
     
-def calculate_row(report_json, kw_demand_15min, demand_schedule_id, op_id, op_json, baseline_operation_7_1, dev):
-    
-    print(f"REPORT JSON: {report_json}")
     report_id = report_json["response"]["_id"]
 
-    try:
-        average_acfm = op_json["response"]["ACFM Made"]
-        peak_15min_acfm = op_json["response"]["peak_15min_acfm"]
-        average_kw_demand = op_json["response"]["kW"]
-        hours_annual = op_json["response"]["Hours/yr"]
-        kw_demand_15min = report_json["response"]["kw_max_avg_15"]
+    # Average Calcs
+    average_acfm = period_data.filter(like='ACFM').sum(axis=1).mean()
+    average_kw_demand = period_data.filter(like='Kilowatts').sum(axis=1).mean()
 
+    # Peak 15 min Calcs
+    peak_15min_acfm = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+    kw_demand_15min = period_data.filter(like='Kilowatts').sum(axis=1)[::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0).max()
+    print(f"kw_demand_15min: {kw_demand_15min}")
+
+    try:
+        hours_annual = op_json["response"]["Hours/yr"]
     except:
         print(f"Did you already run section 3.2? You need to if you haven't.", file=sys.stderr)
         sys.exit(1)
@@ -456,14 +615,16 @@ def calculate_dryer(report_json, baseline_operation_7_1, dev):
     return row_id
 
 
-def start_calculations(operation_period_ids, demand_schedule_id, report_json, kw_demand_15min, baseline_operation_7_1, dev):
+def start_calculations(operation_period_ids, demand_schedule_id, report_json, baseline_operation_7_1, dev):
+
+    df = df_calcs(report_json, dev)
 
     row_ids = []
 
     for operation_period_id in operation_period_ids:
         op_json = common_functions.get_req("operation_period", operation_period_id, dev)
         
-        row_id = calculate_row(report_json, kw_demand_15min, demand_schedule_id, operation_period_id, op_json, baseline_operation_7_1, dev)
+        row_id = calculate_row(report_json, demand_schedule_id, operation_period_id, op_json, baseline_operation_7_1, df, dev)
         row_ids.append(row_id)
 
     row_id = calculate_dryer(report_json, baseline_operation_7_1, dev)
@@ -488,13 +649,13 @@ def start():
     report_json = common_functions.get_req("Report", report_id, dev)
 
     # Make sure we have everything we need before running
-    on_peak_start, off_peak_start, operation_period_ids, demand_schedule_id, kw_demand_15min = check_dependencies(report_id, report_json, dev)
+    on_peak_start, off_peak_start, operation_period_ids, demand_schedule_id = check_dependencies(report_id, report_json, dev)
 
     # Delete any existing rows
     baseline_operation_7_1 = reset_rows(report_id, report_json, dev)
 
     # Run Calculations for each Operation Period
-    start_calculations(operation_period_ids, demand_schedule_id, report_json, kw_demand_15min, baseline_operation_7_1, dev)
+    start_calculations(operation_period_ids, demand_schedule_id, report_json, baseline_operation_7_1, dev)
 
 
 

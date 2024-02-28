@@ -208,7 +208,7 @@ def get_kw_demand_15min(report_json, op_json, dev):
     scenario_differences_id = op_json["response"]["scenario_differences"]
     scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
     try:
-        compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
+        compressor_kw_change = scenario_differences_json["response"]["compressor_peak_kw_change"]
     except:
         compressor_kw_change = 0
 
@@ -217,15 +217,15 @@ def get_kw_demand_15min(report_json, op_json, dev):
     except:
         dryer_kw_change = 0
 
-    kw_change = compressor_kw_change + dryer_kw_change
+    kw_change = compressor_kw_change
 
     new_15_kw = kw_demand_15min + kw_change
-
+    print(f"new_15_kw: {new_15_kw}")
     return new_15_kw
 
 def calculate_row(report_json, op_id, op_json, baseline_operation_7_1, scenario_id, demand_schedule_id, dev):
     
-    print(f"REPORT JSON: {report_json}")
+    print(f"demand_schedule_id: {demand_schedule_id}")
     report_id = report_json["response"]["_id"]
 
     if op_id == demand_schedule_id:
