@@ -200,6 +200,20 @@ def get_peak_15_acfm(op_json, dev):
 
     return new_15_acfm
 
+# Gets the average REPORT KW for an operating period
+def get_kw_avg(report_json, s_op_json, dev):
+    report_id = report_json["response"]["_id"]
+
+    s_op_name = s_op_json["response"]["Name"]
+    r_op_ids = report_json["response"]["operation_period"]
+
+    for r_op_id in r_op_ids:
+        r_op_json = common_functions.get_req("operation_period", r_op_id, dev)
+
+        if r_op_json["response"]["Name"] == s_op_name:
+            return r_op_json["response"]["kW"]
+
+
 def get_kw_demand_15min(report_json, op_json, dev):
     kw_demand_15min = report_json["response"]["kw_max_avg_15"]
 
@@ -224,7 +238,7 @@ def get_kw_demand_15min(report_json, op_json, dev):
 
 def calculate_row(report_json, op_id, op_json, baseline_operation_7_1, scenario_id, demand_schedule_id, dev):
     
-    print(f"REPORT JSON: {report_json}")
+    # print(f"REPORT JSON: {report_json}")
     report_id = report_json["response"]["_id"]
 
     if op_id == demand_schedule_id:
@@ -234,11 +248,24 @@ def calculate_row(report_json, op_id, op_json, baseline_operation_7_1, scenario_
     
     peak_15min_acfm = get_peak_15_acfm(op_json, dev)
 
+    scenario_differences_id = op_json["response"]["scenario_differences"]
+    scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
+
+    try:
+        compressor_kw_change = scenario_differences_json["response"]["compressor_kw_change"]
+    except:
+        compressor_kw_change = 0
+        print("no compressor_kw_change")
+
+    report_avg_kw = get_kw_avg(report_json, op_json, dev) # Get Report kW for this schedule
+
+    new_avg_kw = report_avg_kw + compressor_kw_change
+
 
     try:
         average_acfm = op_json["response"]["ACFM Made"]
         hours_annual = op_json["response"]["Hours/yr"]
-        avg_kw = op_json["response"]["kW"]
+        # avg_kw = op_json["response"]["kW"]
 
     except:
         print(f"Did you already run section 3.2? You need to if you haven't.", file=sys.stderr)
@@ -247,7 +274,7 @@ def calculate_row(report_json, op_id, op_json, baseline_operation_7_1, scenario_
 
     pressure = get_pressure_index(report_id, op_json, dev) # Average Header PSIG For this Operation period
 
-    kwh_annual = avg_kw * hours_annual
+    kwh_annual = new_avg_kw * hours_annual
 
     cost_to_operate = get_cost_to_operate(report_json, kw_demand_15min, kwh_annual, demand_schedule_id, op_id, dev)
 
@@ -258,7 +285,7 @@ def calculate_row(report_json, op_id, op_json, baseline_operation_7_1, scenario_
         "average_acfm": average_acfm,
         "pressure": pressure,
         "hours_annual": hours_annual,
-        "average_kw_demand": avg_kw,
+        "average_kw_demand": new_avg_kw,
         "kwh_annual": kwh_annual,
         "cost_to_operate": cost_to_operate,
         "baseline_operation_7_1": baseline_operation_7_1,
@@ -389,6 +416,7 @@ def reset_rows(baseline_operation_7_1, report_id, report_json, dev):
     return baseline_operation_7_1
 
 def start(dev, report_id, scenario_id):
+    print("starting baseline 7.1")
 
     operation_period_ids, report_json, baseline_operation_7_1, demand_schedule_id = check_dependencies(report_id, scenario_id, dev)
 

@@ -21,6 +21,8 @@ elif scope == "proposed_compressors":
     subprocess.run(['python3', 'routes/eco_calculations/proposed_compressors.py', serialized_data])
 elif scope == "proposed_filters":
     subprocess.run(['python3', 'routes/eco_calculations/proposed_filters.py', serialized_data])
+elif scope == "proposed_pressure":
+    subprocess.run(['python3', 'routes/eco_calculations/proposed_pressure.py', serialized_data])
 
 elif scope == "compare_scenarios":
     subprocess.run(['python3', 'routes/eco_calculations/compare_scenarios.py', serialized_data])

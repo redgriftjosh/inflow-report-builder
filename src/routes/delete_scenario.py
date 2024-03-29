@@ -65,7 +65,8 @@ def clean_json(my_json, processed_ids):
         "Mytable",
         "pressure_sensor",
         "trim",
-        "report"
+        "report",
+        "appendix_graph"
         ]
 
     for key in keys_to_remove:

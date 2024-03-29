@@ -120,6 +120,17 @@ def get_baseline_things(scenario_json, report_id, dev):
     total_kwh_annual = sum(total_kwh_annuals)
     return avg_kws, total_kwh_annual, sum(kw_demand_15mins)
 
+def getPaybackYears(dollars_per_yr, dev, scenario_json):
+    scenario_end_values = scenario_json["response"]["scenario_end_values"]
+    scenario_end_values_json = common_functions.get_req("scenario_end_values", scenario_end_values, dev)
+    incentive = scenario_end_values_json["response"]["incentive"]
+    incremental = scenario_end_values_json["response"]["incremental"]
+
+    paybackYears = (incremental - incentive) / dollars_per_yr
+    return paybackYears
+
+
+
 def start():
     dev, report_id, scenario_id = get_payload()
 
@@ -130,13 +141,15 @@ def start():
     proposed_avg_kw, proposed_kwh_annual, proposed_kw_demand_15min = get_proposed_things(scenario_json, report_id, dev)
     baseline_avg_kw, baseline_kwh_annual, baseline_kw_demand_15min = get_baseline_things(scenario_json, report_id, dev)
 
-    kw_demand = baseline_avg_kw - proposed_avg_kw
+    kw_demand = baseline_kw_demand_15min - proposed_kw_demand_15min
 
-    kw_max = baseline_kw_demand_15min - proposed_kw_demand_15min
+    kw_max = baseline_avg_kw - proposed_avg_kw
 
     dollars_per_yr = baseline_cost_to_operate - proposed_cost_to_operate
 
     total_kwh_annual = baseline_kwh_annual - proposed_kwh_annual
+
+    paybackYears = getPaybackYears(dollars_per_yr, dev, scenario_json)
 
     scenario_end_values = scenario_json["response"]["scenario_end_values"]
 
@@ -144,7 +157,8 @@ def start():
         "dollars_per_yr": dollars_per_yr,
         "kw_demand": kw_demand,
         "kw_max": kw_max,
-        "kwh_annual": total_kwh_annual
+        "kwh_annual": total_kwh_annual,
+        "payback_yrs": paybackYears
         }, dev=dev)
 
 

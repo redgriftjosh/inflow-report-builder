@@ -149,6 +149,26 @@ def get_acfm_entered(op_json, ac_id, dev):
             acfm = dataset_7_2_json["response"]["acfm"]
             return acfm
 
+def get_psi_drop_entered(op_json, ac_id, dev):
+    dataset_7_2_ids = op_json["response"]["dataset_7_2"]
+
+    for dataset_7_2_id in dataset_7_2_ids:
+        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        row_ac_id = dataset_7_2_json["response"]["air_compressor"]
+
+        if row_ac_id == ac_id:
+            try:
+                avg_psi_drop = dataset_7_2_json["response"]["avg_psi_drop"]
+            except:
+                avg_psi_drop = 0
+
+            try: 
+                peak_psi_drop = dataset_7_2_json["response"]["peak_psi_drop"]
+            except:
+                peak_psi_drop = 0
+            
+            return avg_psi_drop, peak_psi_drop
+
 def get_peak_acfm_entered(op_json, ac_id, dev):
     dataset_7_2_ids = op_json["response"]["dataset_7_2"]
 
@@ -226,8 +246,10 @@ def start():
         
         op_json = common_functions.get_req("operation_period", operating_period_id, dev)
 
+        # Get's the average header pressure in report. Will be something like "107.422313453"
         pressure = get_pressure_index(report_id, op_json, dev)
 
+        # Looks at average pressure change from filters. pressure_change will be something like "-3.21"
         pressure_change = get_pressure_change(op_json, dev)
 
         gal_per_cfm = common_functions.get_gal_per_cfm(ac_ids, report_id, dev)
@@ -250,12 +272,19 @@ def start():
             acfm = get_acfm_entered(op_json, ac, dev)
             peak_acfm = get_peak_acfm_entered(op_json, ac, dev)
             
+            # Entered in from filters changed
+            avg_psi_drop, peak_psi_drop = get_psi_drop_entered(op_json, ac, dev)
+            
             # Using average ACFM
             avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, is_peak=False, dev=dev)
+            avg_kw = avg_kw + avg_kw * (avg_psi_drop * 0.005)
             avg_kws.append(avg_kw)
+
 
             # Using peak ACFM
             max_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, peak_acfm, peak_kw_per_cfm, is_new, gal_per_cfm, is_peak=True, dev=dev)
+            max_kw = max_kw + max_kw * (peak_psi_drop * 0.005)
+            print(f"ac_name: {ac_name}, avg_kw: {avg_kw}, max_kw: {max_kw}")
             max_kws.append(max_kw)
         
         # New Calculated Values

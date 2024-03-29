@@ -35,79 +35,87 @@ def get_payload():
 
     return dev, report_id, scenario_id
 
-def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
+# Returns a list of filter ids that are attached to the current air compressor.
+def get_report_filters(r_ac_name, report_json, dev):
+    r_f_ids = report_json["response"]["filter"]
 
-    scenario_difference = response["id"]
+    ac_r_f_ids = []
+    for r_f_id in r_f_ids:
+        r_f_json = common_functions.get_req("filter", r_f_id, dev)
+        connected_to = r_f_json["response"]["connected_to"]
+        connected_to_list = connected_to.split(", ")
+        if r_ac_name in connected_to_list:
+            ac_r_f_ids.append(r_f_id)
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    return ac_r_f_ids
 
-    return scenario_difference
+def get_filter_psis(f_ids, dev):
+    peak_psis = []
+    avg_psis = []
 
-def get_total_report_filter_psi_drop(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
-    filter_ids = report_json["response"]["filter"]
+    for f_id in f_ids:
+        f_json = common_functions.get_req("filter", f_id, dev)
+        peak_psi = f_json["response"]["peak_psig_drop"]
+        peak_psis.append(peak_psi)
 
-    psi_drops = []
-    for filter_id in filter_ids:
-        filter_json = common_functions.get_req("filter", filter_id, dev)
-        psi_drop = filter_json["response"]["psig_drop"]
-
-        psi_drops.append(psi_drop)
-
-    total_psi_drop = sum(psi_drops)
-
-    return total_psi_drop
-
-def get_total_baseline_filter_psi_drop(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
-
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
-    filter_ids = scenario_baseline_json["response"]["filter"]
-
-    psi_drops = []
-    for filter_id in filter_ids:
-        filter_json = common_functions.get_req("filter", filter_id, dev)
-        psi_drop = filter_json["response"]["psig_drop"]
-
-        psi_drops.append(psi_drop)
+        avg_psig_drop = f_json["response"]["psig_drop"]
+        avg_psis.append(avg_psig_drop)
     
-    total_baseline_filter_psi_drop = sum(psi_drops)
+    return sum(avg_psis), sum(peak_psis)
 
-    return total_baseline_filter_psi_drop
 
-def get_op_ids(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+def get_baseline_filters(r_ac_name, scenario_id, dev):
+    s_json = common_functions.get_req("scenario", scenario_id, dev)
+    s_baseline_id = s_json["response"]["scenario_baseline"]
+    s_baseline_json = common_functions.get_req("scenario_baseline", s_baseline_id, dev)
+    s_f_ids = s_baseline_json["response"]["filter"]
 
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    ac_s_f_ids = []
+    for s_f_id in s_f_ids:
+        s_f_json = common_functions.get_req("filter", s_f_id, dev)
+        connected_to = s_f_json["response"]["connected_to"]
+        connected_to_list = connected_to.split(", ")
+        if r_ac_name in connected_to_list:
+            ac_s_f_ids.append(s_f_id)
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    return ac_s_f_ids
 
-    operating_period_ids = scenario_baseline_json["response"]["operation_period"]
-
-    return operating_period_ids
 
 def start():
     dev, report_id, scenario_id = get_payload()
-    
-    total_baseline_filter_psi_drop = get_total_baseline_filter_psi_drop(scenario_id, dev)
-    total_report_filter_psi_drop = get_total_report_filter_psi_drop(report_id, dev)
 
-    total_filter_psi_drop = total_baseline_filter_psi_drop - total_report_filter_psi_drop
+    report_json = common_functions.get_req("report", report_id, dev)
 
-    operating_period_ids = get_op_ids(scenario_id, dev)
+    r_ac_ids = report_json["response"]["air_compressor"]
 
-    for operating_period_id in operating_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
-        try:
-            scenario_differences = operating_period_json["response"]["scenario_differences"]
-        except:
-            scenario_differences = create_new_scenario_difference(operating_period_id, dev)
+    # I don't think it needs to be per operating period because it should be the same difference between each operating period.
+    # For each compressor
+    for r_ac_id in r_ac_ids:
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"filter_psi_change": total_filter_psi_drop}, dev=dev)
+        # Get Compressor Name
+        r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
+        r_ac_name = r_ac_json["response"]["Customer CA"]
+        print("")
+        print(f"Compressor: {r_ac_name}")
 
-        baseline_global.update_op_stats(operating_period_id, report_id, dev)
+        # Get Report Filters
+        r_f_ids = get_report_filters(r_ac_name, report_json, dev)
+        print(f"r_f_ids: {r_f_ids}")
 
+        # PSI drop in Report (avg & peak)
+        r_avg_psi, r_peak_psi = get_filter_psis(r_f_ids, dev)
+        print(f"Report avg psi drop: {r_avg_psi}, Report peak psi drop: {r_peak_psi}")
 
+        # Get baseline Filters
+        s_f_ids = get_baseline_filters(r_ac_name, scenario_id, dev)
+        print(f"s_f_ids: {s_f_ids}")
+
+        # PSI in baseline (avg & peak)
+        s_avg_psi, s_peak_psi = get_filter_psis(s_f_ids, dev)
+        print(f"baseline avg psi drop: {s_avg_psi}, baseline peak psi drop: {s_peak_psi}")
+
+        # baseline PSI Differences (avg & peak)
+        print(f"PSI Differences!")
+        print(f"Compressor: {r_ac_name}, avg psi difference: {s_avg_psi - r_avg_psi}, peak psi difference: {s_peak_psi - r_peak_psi}")
+        print("")
 start()

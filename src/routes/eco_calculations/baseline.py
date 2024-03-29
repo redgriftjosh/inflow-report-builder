@@ -2,14 +2,16 @@ import sys
 import json
 from datetime import datetime, timedelta
 import os
-import baseline_leaks
+# import baseline_leaks
 import baseline_7_1
-import baseline_7_2
+# import baseline_7_2
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
 import common_functions
+
+print("Starting baseline.py")
 
 def get_payload():
     data = json.loads(sys.argv[1])
