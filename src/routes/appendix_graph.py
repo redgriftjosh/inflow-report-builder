@@ -322,8 +322,10 @@ def generate_graph(df, report_id, dev, kw_period, acfm_period, pressure_period, 
     # We need to do the following to add a new id to the list of ids in the report object.
     appendix_graph_id = response_data.get('id', None) # Get the id of the Graph we just created
     # print(f"appendix_graph_id: {appendix_graph_id}")
-
-    existing_ids = report_json.get("response").get("appendix_graph") # Extract teh  existing IDs from the report object
+    try:
+        existing_ids = report_json["response"]["appendix_graph"] # Extract teh  existing IDs from the report object
+    except:
+        existing_ids = []
     # print(f"existing_ids: {existing_ids}")
 
     all_ids = existing_ids + [appendix_graph_id]
