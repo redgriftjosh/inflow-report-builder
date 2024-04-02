@@ -323,7 +323,7 @@ def generate_graph(df, report_id, dev, kw_period, acfm_period, pressure_period, 
     appendix_graph_id = response_data.get('id', None) # Get the id of the Graph we just created
     # print(f"appendix_graph_id: {appendix_graph_id}")
 
-    existing_ids = report_json["response"]["appendix_graph"] # Extract teh  existing IDs from the report object
+    existing_ids = report_json.get("response").get("appendix_graph") # Extract teh  existing IDs from the report object
     # print(f"existing_ids: {existing_ids}")
 
     all_ids = existing_ids + [appendix_graph_id]
