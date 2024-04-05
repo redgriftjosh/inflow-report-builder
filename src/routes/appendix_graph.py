@@ -30,7 +30,7 @@ def add_header_pressure_to_master_df(master_df, report_id, dev):
                 current_name_date = df.columns[1]
                 current_name_num = df.columns[0]
                 current_name_pressure = df.columns[2]
-                df.rename(columns={current_name_date: f"Date{100}", current_name_num: f"Num{100}", current_name_pressure: f"Pressure{id}"}, inplace=True)
+                df.rename(columns={current_name_date: f"Date{100}", current_name_num: f"Num{100}", current_name_pressure: f"Pressure{pressure_sensor}"}, inplace=True)
 
                 if master_df_pressure is None:
                     master_df_pressure = pd.merge(master_df, df, left_on=f"Date1", right_on=f"Date{100}", how="outer")
@@ -38,7 +38,7 @@ def add_header_pressure_to_master_df(master_df, report_id, dev):
                 else:
                     master_df_pressure = pd.merge(master_df_pressure, df, left_on=f"Date1", right_on=f"Date{100}", how="outer")
 
-            return master_df_pressure
+        return master_df_pressure
     else:
         return master_df
 
@@ -138,6 +138,7 @@ def compile_df(report_id, dev):
         current_name_num = df.columns[0]
         current_name_amps = df.columns[2]
         df.rename(columns={current_name_date: f"Date{idx+1}", current_name_num: f"Num{idx+1}", current_name_amps: f"Amps{idx+1}"}, inplace=True)
+        # df.to_csv(f"DataFrame index: {idx}.csv", index=False)
 
         # first_date = df.iloc[0, 1]
 
@@ -148,9 +149,11 @@ def compile_df(report_id, dev):
             master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
             common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
-    
-    master_df_pressure = add_header_pressure_to_master_df(master_df, report_id, dev)
 
+    # master_df.to_csv(f"Master_df.csv", index=False)
+    master_df = add_header_pressure_to_master_df(master_df, report_id, dev)
+
+    master_df.to_csv("master_df.csv", index=False)
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
         common_functions.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = common_functions.trim_df(report_json, master_df, dev)
@@ -158,8 +161,7 @@ def compile_df(report_id, dev):
 
     print("Added: master_df")
     
-    master_df_pressure.to_csv("master.csv", index=False)
-    return master_df_pressure
+    return master_df
 
 def get_next_order(report_json, dev):
     if "appendix_graph" in report_json["response"]:
