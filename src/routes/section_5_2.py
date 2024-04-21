@@ -92,10 +92,10 @@ def filter_selection(df, start_date, start_time, end_date, end_time, report_id, 
         common_functions.patch_req("Report", report_id, body={"loading": f"We're having some trouble Selecting the timerange you specified. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
-def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, dev):
+def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, avg_pressure, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
-    avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= threshold_psi].mean()
+    # avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= threshold_psi].mean()
 
 
     fig = go.Figure()
@@ -180,17 +180,85 @@ def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, dev):
     print(f"acfm_graph_3_min() {response.status_code, response.text}")
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
+# Gets the header pressure dataframe
+def get_pressure_df(dev, report_id):
+    report_json = common_functions.get_req("report", report_id, dev)
+    
+    if "pressure_sensor" in report_json["response"]:
+        pressure_sensors = report_json["response"]["pressure_sensor"]
+        for sensor in pressure_sensors:
+            pressure_json = common_functions.get_req("pressure_sensor", sensor, dev)
+            if pressure_json["response"]["header"] == True:
+                if "csv-psig" in pressure_json["response"]:
+                    pressure_csv = pressure_json["response"]["csv-psig"]
+                    pressure_csv = f"https:{pressure_csv}"
+                    return common_functions.csv_to_df(pressure_csv)
+                else:
+                    common_functions.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+                    sys.exit()
+
+def filter_df(df, report_id, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+    if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
+        op_per_type = report_json["response"]["operating_period_type"]
+
+        if op_per_type != "Experimental":
+            print(f"Please Update your operating period type.", file=sys.stderr)
+            sys.exit(1)
+
+        
+        operating_period_ids = report_json["response"]["operation_period"]
+        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+    else:
+        print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
+        sys.exit(1)
+    
+    master_df = None
+    for operating_period_id in operating_period_ids:
+        period_data = common_functions.experimental_operating_period(df, operating_period_id, dev)
+        if master_df is None:
+            master_df = period_data
+        else:
+            # Add the new dataframe to the bottom of the master_df
+            master_df = pd.concat([master_df, period_data], ignore_index=True)
+    
+    #save master_df to csv
+    # master_df.to_csv("master_df.csv")
+
+    return master_df
+
+def get_avg_pressure(dev, report_id):
+    report_json = common_functions.get_req("report", report_id, dev)
+
+    # 1. Get the header pressure csv
+    df = get_pressure_df(dev, report_id) # ""rEdUnDaNt""", I know. Fix it if you want but the client won't care either.
+    
+    # 2. Trim it
+    if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
+        df = common_functions.trim_df(report_json, df, dev) # trim the df to be all synced up with other pressure csvs
+    
+    # 3. Exclusions
+    if "exclusion" in report_json["response"]:
+        df = common_functions.exclude_from_df(df, report_json, dev)
+    
+    # 4. Filter by All Operating Period - filter by each and then merge onto the bottom
+    df = filter_df(df, report_id, dev)
+
+    # 5. Get the average of the pressure column by iloc 2
+    avg_pressure = df.iloc[:, 2].mean()
+    
+    return avg_pressure
+        
+
 def start():
     dev, report_id = get_payload()
     threshold_psi, low_psi, section_5_2 = get_dependencies(report_id, dev)
 
+    # This is for visualising on the graph so I'm only trimming
     df = get_df(dev, report_id)
-    
-    # df = filter_selection(df, start_date, start_time, end_date, end_time, report_id, dev)
 
-    create_graph(df, report_id, threshold_psi, low_psi, section_5_2, dev)
+    avg_pressure = get_avg_pressure(dev, report_id)
 
-
-
+    create_graph(df, report_id, threshold_psi, low_psi, section_5_2, avg_pressure, dev)
 
 start()

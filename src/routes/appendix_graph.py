@@ -241,7 +241,7 @@ def generate_graph(df, report_id, dev, kw_period, acfm_period, pressure_period, 
         y=df['pressure_period'],
         mode='markers',
         marker=dict(size=20, color='#ff7700'),
-        name='P1',
+        name='Header PSI',
         yaxis='y'  # Associate this trace with the secondary y-axis
     ))
 

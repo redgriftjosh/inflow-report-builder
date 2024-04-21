@@ -38,7 +38,7 @@ def add_header_pressure_to_master_df(master_df, report_id, dev):
                 else:
                     master_df_pressure = pd.merge(master_df_pressure, df, left_on=f"Date1", right_on=f"Date{100}", how="outer")
 
-            return master_df_pressure
+        return master_df_pressure
     else:
         return master_df
 
@@ -238,7 +238,7 @@ def generate_graph(df, graph_id, dev, kw_period, acfm_period, pressure_period):
         y=df['pressure_period'],
         mode='markers',
         marker=dict(size=20, color='#ff7700'),
-        name='P1',
+        name='Header PSI',
         yaxis='y'  # Associate this trace with the secondary y-axis
     ))
 

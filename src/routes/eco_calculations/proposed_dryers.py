@@ -254,17 +254,51 @@ def get_total_proposed_dryer_kw(report_id, scenario_id, dev):
 
         if control == "Cycling":
             df = get_cfm_df(report_json, ac_ids, dev)
-            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm, dryer_json))
             kw = df["Kilowatts"].mean()
-        else:
+
+        elif control == "Non-Cycling":
             kw = full_load_kw
+
+        elif control == "Timed":
+            kw = timed_kw_calc(dryer_json, full_load_kw)
+
+        elif control == "Dew Point Demand":
+            df = get_cfm_df(report_json, ac_ids, dev)
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json))
+            kw = df["Kilowatts"].mean()
+
+        # if control == "Cycling":
+        #     df = get_cfm_df(report_json, ac_ids, dev)
+        #     df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
+        #     kw = df["Kilowatts"].mean()
+        # else:
+        #     kw = full_load_kw
         kws.append(kw)
     
     total_kw = sum(kws)
 
     return total_kw
 
-def get_total_proposed_dryer_cfm(scenario_id, dev):
+def get_cfm_loss_dpd(acfm, capacity_scfm, type):
+    operational_factor = acfm / capacity_scfm
+
+    if type == "Desiccant Dryer No Heat":
+        cfm_loss = capacity_scfm * 0.18 * operational_factor
+        return cfm_loss
+    elif type == "Desiccant With Heat":
+        cfm_loss = capacity_scfm * 0.08 * operational_factor
+        return cfm_loss
+    elif type == "Desiccant With Heat & Blower":
+        cfm_loss = capacity_scfm * 0.03 * operational_factor
+        return cfm_loss
+    elif type == "Refrigerated":
+        cfm_loss = 0
+        return cfm_loss
+
+def get_total_proposed_dryer_cfm(report_id, scenario_id, dev):
+    report_json = common_functions.get_req("report", report_id, dev)
+
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
@@ -277,8 +311,19 @@ def get_total_proposed_dryer_cfm(scenario_id, dev):
 
         capacity_scfm = dryer_json["response"]["capacity_scfm"]
         type = dryer_json["response"]["type_if_desiccant_dryer"]
+        control = dryer_json["response"]["control"]
+        connected_to = dryer_json["response"]["connected_to"]
 
-        cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
+        ac_ids = get_ac_ids_for_dryer(report_json, connected_to, dev)
+
+        if control == "Dew Point Demand":
+            df = get_cfm_df(report_json, ac_ids, dev)
+            df[f"CFM Loss"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: get_cfm_loss_dpd(acfm, capacity_scfm, type))
+            cfm_loss = df["CFM Loss"].mean()
+        else:
+            cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
+
+        #cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
 
         adjusted_cfms.append(cfm_loss)
     
@@ -296,6 +341,39 @@ def get_op_ids(scenario_id, dev):
     operating_period_ids = scenario_proposed_json["response"]["operation_period"]
 
     return operating_period_ids
+
+def timed_kw_calc(dryer_json, full_load_kw):
+    try:
+        # e.g. 50
+        load_factor = dryer_json["response"]["desiccant_load_factor_kw"]
+    except:
+        print(f"Missing Load Factor for Timed Dryer", file=sys.stderr)
+        sys.exit(1)
+    
+    avg_kw = full_load_kw * (load_factor / 100)
+
+    return avg_kw
+
+def dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json):
+    try:
+        multiplication_factor = dryer_json["response"]["multiplication_factor_cfm"]
+    except:
+        multiplication_factor = 1
+        
+    acfm = acfm * multiplication_factor
+
+    try:
+        # e.g. 50
+        load_factor = dryer_json["response"]["desiccant_load_factor_kw"]
+    except:
+        print(f"Missing Load Factor for Dew Point Demand Dryer", file=sys.stderr)
+        sys.exit(1)
+    
+    operational_factor = acfm / capacity_scfm
+
+    avg_kw = full_load_kw * (load_factor / 100) * operational_factor
+
+    return avg_kw
 
 def get_total_report_dryer_kw(report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
@@ -315,12 +393,30 @@ def get_total_report_dryer_kw(report_id, dev):
 
         ac_ids = get_ac_ids_for_dryer(report_json, connected_to, dev)
 
+        # Just copied from baseline_7_1.py (not eco)
         if control == "Cycling":
             df = get_cfm_df(report_json, ac_ids, dev)
-            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm, dryer_json))
             kw = df["Kilowatts"].mean()
-        else:
+
+        elif control == "Non-Cycling":
             kw = full_load_kw
+
+        elif control == "Timed":
+            kw = timed_kw_calc(dryer_json, full_load_kw)
+
+        elif control == "Dew Point Demand":
+            df = get_cfm_df(report_json, ac_ids, dev)
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json))
+            kw = df["Kilowatts"].mean()
+
+        # Old code because I'm a code hoarder hehe rawr xD
+        # if control == "Cycling":
+        #     df = get_cfm_df(report_json, ac_ids, dev)
+        #     df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
+        #     kw = df["Kilowatts"].mean()
+        # else:
+        #     kw = full_load_kw
         print(f"report_dryer_kw: {kw}")
         kws.append(kw)
     
@@ -331,8 +427,8 @@ def get_total_report_dryer_kw(report_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
     
-    total_proposed_dryer_cfm = get_total_proposed_dryer_cfm(scenario_id, dev)
-    total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev)
+    total_proposed_dryer_cfm = get_total_proposed_dryer_cfm(scenario_id, dev) 
+    total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev) # Just grabs SCFM Loss from the report
 
     total_dryer_cfm = total_proposed_dryer_cfm - total_report_dryer_cfm
 
