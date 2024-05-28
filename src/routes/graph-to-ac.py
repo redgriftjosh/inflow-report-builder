@@ -13,7 +13,7 @@ import numpy as np
 
 data = json.loads(sys.argv[1])
 # data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696607311786x746368974526902900/%231.csv', 'logger-graph-id': '1696607318343x927521251863035900', 'dev': 'no'}
-print(f"Incoming Webhook: {data}")
+# print(f"Incoming Webhook: {data}")
 csv_url = data.get('file')
 logger_graph_id = data.get('logger-graph-id')
 dev = data.get('dev')
@@ -21,13 +21,42 @@ if dev == 'yes':
     dev = '/version-test'
 else:
     dev = ''
+try:
+    response = requests.get(f"https:{csv_url}")
+except:
+    print(f"No File Uploaded", file=sys.stderr)
+    sys.exit(1)
 
-response = requests.get(csv_url)
 response.raise_for_status()
 csv_data = StringIO(response.text)
-df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p')
+
+try:
+    df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p')
+except Exception as e:
+    print(f"Cannot read CSV. Please follow the formatting Guide.", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    pd.to_datetime(df.iloc[:, 1], format='%m/%d/%y %I:%M:%S %p')
+except ValueError:
+    print("Column 'C' is not properly formatted as a date.", file=sys.stderr)
+    sys.exit(1)
+
+# Calculate the time difference between each date
+df['Time_Difference'] = df.iloc[:, 1].diff()
 
 df.info()
+
+print(df.head(20))
+
+# Loop through the DataFrame to find discrepancies
+for i in range(1, len(df)):  # Start from 1 because the first row's diff is NaT
+    if df.iloc[i]['Time_Difference'] != pd.Timedelta(seconds=12):
+        if i == 1:
+            print(f"It looks like the date column is not seeing the seconds. Double check the date format matches 'mm/dd/yy hh:mm:ss AM/PM': {i}", file=sys.stderr)
+        print(f"It looks like not all dates are 12 seconds apart! I found this at row {i}", file=sys.stderr)
+        sys.exit(1)
+
 
 
 fig = go.Figure()

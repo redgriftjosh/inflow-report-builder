@@ -1532,6 +1532,12 @@ def compile_master_df(report_id, dev):
             patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
+    master_df.info()
+
+    # Get the total number of rows
+    total_rows = master_df.shape[0]
+    print("Total number of rows:", total_rows)
+
     master_df_pressure = add_pressure_to_master_df(master_df, report_id, dev)
 
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:

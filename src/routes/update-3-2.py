@@ -1,5 +1,9 @@
+import os
 import sys
 import json
+import threading
+import time
+import psutil
 import requests
 from io import StringIO
 import pandas as pd
@@ -12,6 +16,25 @@ import base64
 import urllib.parse
 import common_functions
 
+# def background_task():
+#     global max_memory   
+#     while not stop_thread:
+#         mem_info = process.memory_info()
+#         # print(f"Memory usage: {mem_info.rss / (1024 * 1024)} MB")
+#         max_memory = max(max_memory, mem_info.rss / (1024 * 1024))
+#         time.sleep(0.1)
+
+# Initialize a global variable to control the thread
+# stop_thread = False
+# max_memory = 0
+# process = psutil.Process(os.getpid())
+
+# # Start the thread before your script's main execution
+# thread = threading.Thread(target=background_task)
+# thread.start()
+
+
+# try:
 # local_data = '{"report-id": "1696875806393x222632359563624450", "dev": "yes"}'
 data = json.loads(sys.argv[1]) # Proper Code. Keep this
 
@@ -210,3 +233,10 @@ pressure_peaks(report_id, dev)
 acfm_graph_3_min(master_df, report_id)
 
 total_annual_operating_hours(report_id, dev)
+# finally:
+#     # Set the stop_thread flag to True to stop the background task
+#     stop_thread = True
+#     # Wait for the background thread to finish
+#     thread.join()
+#     # print max memory
+#     print(f"Max memory usage: {max_memory} MB")

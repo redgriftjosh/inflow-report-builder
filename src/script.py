@@ -1,3 +1,5 @@
+import threading
+import time
 from flask import Flask, request, jsonify
 import subprocess
 import os
@@ -16,7 +18,7 @@ def run_script(data, script):
 
     # I wanted to see the errors in the console
     # result = subprocess.run(['python3', script_path, serialized_data])
-    
+
     if result.returncode == 0:
         # If the script was successful, return the success message
         return ("Success!", 200)
@@ -55,11 +57,6 @@ def run_pdf_report(script_body, script_name):
 #     response = run_script(data = request.get_json(), script='graph-to-pressure-sensor.py')
 #     return response
 
-@app.route('/graph-to-ac', methods=['POST'])
-def graph_to_ac():
-    response = run_script(data = request.get_json(), script='graph-to-ac.py')
-    return response
-
 @app.route('/reset-dataset-7-2', methods=['POST'])
 def reset_dataset_7_2():
     response = run_script(data = request.get_json(), script='reset_dataset_7_2.py')
@@ -95,10 +92,10 @@ def update_7_2():
     response = run_script(data = request.get_json(), script='update_7_2.py')
     return response
 
-@app.route('/update-3-2', methods=['POST'])
-def update_3_2():
-    response = run_script(data = request.get_json(), script='update-3-2.py')
-    return response
+# @app.route('/update-3-2', methods=['POST'])
+# def update_3_2():
+#     response = run_script(data = request.get_json(), script='update-3-2.py')
+#     return response
     
 @app.route('/update-3-1', methods=['POST'])
 def update_3_1():
