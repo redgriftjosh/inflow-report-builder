@@ -10,6 +10,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import numpy as np
+import common_functions
 
 data = json.loads(sys.argv[1])
 # data = {'file': 'https://b67746bf2162451d7611c5f5e3bde12a.cdn.bubble.io/f1696607311786x746368974526902900/%231.csv', 'logger-graph-id': '1696607318343x927521251863035900', 'dev': 'no'}
@@ -27,6 +28,15 @@ except:
     print(f"No File Uploaded", file=sys.stderr)
     sys.exit(1)
 
+logger_graph_json = common_functions.get_req("logger_graph", logger_graph_id, dev)
+ac_data_logger_id = logger_graph_json["response"]["ac_data_logger"]
+
+ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+ac_id = ac_data_logger_json["response"]["air_compressor"]
+
+ac_json = common_functions.get_req("air_compressor", ac_id, dev)
+report_id = ac_json["response"]["report"]
+
 response.raise_for_status()
 csv_data = StringIO(response.text)
 
@@ -35,11 +45,15 @@ try:
 except Exception as e:
     print(f"Cannot read CSV. Please follow the formatting Guide.", file=sys.stderr)
     sys.exit(1)
+common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅", "is_loading_error": "no"}, dev=dev)
+df.info()
 
+print(df.head(20))
 try:
     pd.to_datetime(df.iloc[:, 1], format='%m/%d/%y %I:%M:%S %p')
+    common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Checking for Consistend Dates...", "is_loading_error": "no"}, dev=dev)
 except ValueError:
-    print("Column 'C' is not properly formatted as a date.", file=sys.stderr)
+    print("Column 'B' is not properly formatted as a date.", file=sys.stderr)
     sys.exit(1)
 
 # Calculate the time difference between each date
@@ -56,7 +70,7 @@ for i in range(1, len(df)):  # Start from 1 because the first row's diff is NaT
             print(f"It looks like the date column is not seeing the seconds. Double check the date format matches 'mm/dd/yy hh:mm:ss AM/PM': {i}", file=sys.stderr)
         print(f"It looks like not all dates are 12 seconds apart! I found this at row {i}", file=sys.stderr)
         sys.exit(1)
-
+common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Consistend Dates ✅", "is_loading_error": "no"}, dev=dev)
 
 
 fig = go.Figure()
@@ -77,6 +91,8 @@ fig.update_layout(
 # fig.show()
 
 # fig.write_html("scatterplot.html")
+
+common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Consistend Dates ✅, Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
 fig.write_image("temp_image.jpeg", width=1920, height=540)
 
