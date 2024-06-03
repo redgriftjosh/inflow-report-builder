@@ -82,7 +82,10 @@ def clean_json(my_json, processed_ids):
         "section_5_1",
         "section_5",
         "trim",
-        "appendix_graph"
+        "appendix_graph",
+        "appendix_page",
+        "page",
+        "sections"
         ]
 
     for key in keys_to_remove:
