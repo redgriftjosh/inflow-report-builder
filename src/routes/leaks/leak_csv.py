@@ -1,4 +1,4 @@
-import common_functions
+from routes import common_functions
 import json
 import sys
 
