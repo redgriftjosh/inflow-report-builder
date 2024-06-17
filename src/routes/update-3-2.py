@@ -15,6 +15,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import common_functions
+from utilities import requests_util
 
 # def background_task():
 #     global max_memory   
@@ -183,28 +184,9 @@ def acfm_graph_3_min(master_df, report_id):
     with open(filename, "rb") as img_file:
         image_data = img_file.read()
     
-    encoded_filename = urllib.parse.quote(filename)
-
     encoded_image_data = base64.b64encode(image_data).decode('utf-8')
 
-
-    payload = {
-        "acfm-graph-3-min": {
-            "filename": encoded_filename,
-            "private": False,
-            "contents": encoded_image_data
-        }
-    }
-
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/Report/{report_id}"
-
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    response = requests.patch(url, json=payload, headers=headers)
-    # print(response.text)
-    print(f"acfm_graph_3_min() {response.status_code, response.text}")
+    requests_util.patch_file_req("acfm-graph-3-min", encoded_image_data, "temp_image.jpeg", "report", report_id, dev)
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 

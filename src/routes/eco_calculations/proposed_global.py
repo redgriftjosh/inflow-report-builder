@@ -63,11 +63,23 @@ def get_real_op_avg_kw(report_id, op_name, dev):
             kw = operating_period_json["response"]["kW"]
             return kw
 
+def create_new_scenario_difference(op_id, dev):
+    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
+    scenario_difference = response["id"]
+
+    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+
+    return scenario_difference
 
 def update_op_stats(op_id, report_id, dev):
+    print(f"Updating op stats for op_id: {op_id}")
     op_json = common_functions.get_req("operation_period", op_id, dev)
-    scenario_differences = op_json["response"]["scenario_differences"]
+    try:
+        scenario_differences = op_json["response"]["scenario_differences"]
+    except:
+        print(f"No scenario_differences, creating one...")
+        scenario_differences = create_new_scenario_difference(op_id, dev)
 
     scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences, dev)
 

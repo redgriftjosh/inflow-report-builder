@@ -8,6 +8,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import numpy as np
+from utilities import data_crunch_util, requests_util
 
 data = json.loads(sys.argv[1])
 
@@ -21,10 +22,15 @@ else:
 
 print(pressure_id)
 
-response = requests.get(csv_psig)
+pressure_json = requests_util.get_req("pressure_sensor", pressure_id, dev)
+report_id = pressure_json["response"]["report"]
+
+print(f"csv_psig: {csv_psig}")
+response = data_crunch_util.download_csv(csv_psig)
 response.raise_for_status()
 csv_data = StringIO(response.text)
-df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p')
+# df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p')
+df = data_crunch_util.csv_to_df(csv_data, report_id, dev)
 
 df.info()
 
@@ -42,6 +48,8 @@ fig.update_layout(
     xaxis_title="Timestamp",
     yaxis_title="psig",
 )
+
+requests_util.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Consistend Dates ✅, Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
 fig.write_image("temp_image.jpeg", width=1920, height=540)
 

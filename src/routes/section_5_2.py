@@ -124,9 +124,8 @@ def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, avg_pressur
     xref="paper", yref="paper",  # Use 'paper' reference for relative positioning
     x=0.5, y=0.15,  # Center of the graph (0.5, 0.5) in relative coordinates
     showarrow=False,  # Do not show an arrow pointing to the text
-    font=dict(
-        size=72  # Font size of the text
-        )
+    font=dict(size=72),# Font size of the text
+    bgcolor="white"
     )
 
     fig.update_layout(

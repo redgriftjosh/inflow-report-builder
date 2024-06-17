@@ -37,15 +37,21 @@ def get_payload():
     except:
         print(f"Can't find variable: scenario_id", file=sys.stderr)
         sys.exit(1)
+    
+    try:
+        scope = data["scope"]
+    except:
+        print(f"Can't find variable: scope", file=sys.stderr)
+        sys.exit(1)
 
-    return dev, report_id, scenario_id
+    return dev, report_id, scenario_id, scope
 
 def start():
-    dev, report_id, scenario_id = get_payload()
+    dev, report_id, scenario_id, scope = get_payload()
 
     # variables = baseline_leaks.start(dev, report_id, scenario_id)
 
-    baseline_7_1.start(dev, report_id, scenario_id)
+    baseline_7_1.start(dev, report_id, scenario_id, scope)
 
     # baseline_7_2.start(dev, report_id, scenario_id, variables)
 

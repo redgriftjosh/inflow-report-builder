@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import os
 # import proposed_leaks
 import proposed_7_1
+print("Hello from proposed.py1")
 # import proposed_7_2
 
 current = os.path.dirname(os.path.realpath(__file__))
@@ -36,14 +37,20 @@ def get_payload():
         print(f"Can't find variable: scenario_id", file=sys.stderr)
         sys.exit(1)
 
-    return dev, report_id, scenario_id
+    try:
+        scope = data["scope"]
+    except:
+        print(f"Can't find variable: scope", file=sys.stderr)
+        sys.exit(1)
+
+    return dev, report_id, scenario_id, scope
 
 def start():
-    dev, report_id, scenario_id = get_payload()
+    dev, report_id, scenario_id, scope = get_payload()
 
     # variables = proposed_leaks.start(dev, report_id, scenario_id)
-
-    proposed_7_1.start(dev, report_id, scenario_id)
+    print("Hello from proposed.py")
+    proposed_7_1.start(dev, report_id, scenario_id, scope)
 
     # proposed_7_2.start(dev, report_id, scenario_id, variables)
 

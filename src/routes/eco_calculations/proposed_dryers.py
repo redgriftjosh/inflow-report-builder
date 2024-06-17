@@ -254,7 +254,7 @@ def get_total_proposed_dryer_kw(report_id, scenario_id, dev):
 
         if control == "Cycling":
             df = get_cfm_df(report_json, ac_ids, dev)
-            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm, dryer_json))
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
             kw = df["Kilowatts"].mean()
 
         elif control == "Non-Cycling":
@@ -277,7 +277,8 @@ def get_total_proposed_dryer_kw(report_id, scenario_id, dev):
         kws.append(kw)
     
     total_kw = sum(kws)
-
+    print("")
+    print(f"total_kw: {total_kw}")
     return total_kw
 
 def get_cfm_loss_dpd(acfm, capacity_scfm, type):
@@ -315,7 +316,6 @@ def get_total_proposed_dryer_cfm(report_id, scenario_id, dev):
         connected_to = dryer_json["response"]["connected_to"]
 
         ac_ids = get_ac_ids_for_dryer(report_json, connected_to, dev)
-
         if control == "Dew Point Demand":
             df = get_cfm_df(report_json, ac_ids, dev)
             df[f"CFM Loss"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: get_cfm_loss_dpd(acfm, capacity_scfm, type))
@@ -396,7 +396,7 @@ def get_total_report_dryer_kw(report_id, dev):
         # Just copied from baseline_7_1.py (not eco)
         if control == "Cycling":
             df = get_cfm_df(report_json, ac_ids, dev)
-            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm, dryer_json))
+            df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
             kw = df["Kilowatts"].mean()
 
         elif control == "Non-Cycling":
@@ -427,7 +427,7 @@ def get_total_report_dryer_kw(report_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
     
-    total_proposed_dryer_cfm = get_total_proposed_dryer_cfm(scenario_id, dev) 
+    total_proposed_dryer_cfm = get_total_proposed_dryer_cfm(report_id, scenario_id, dev) 
     total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev) # Just grabs SCFM Loss from the report
 
     total_dryer_cfm = total_proposed_dryer_cfm - total_report_dryer_cfm

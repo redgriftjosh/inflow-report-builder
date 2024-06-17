@@ -1,14 +1,18 @@
 import sys
 import json
 import subprocess
+# from routes.eco_calculations.proposed import start as proposed
 
 
 data = json.loads(sys.argv[1])
 serialized_data = json.dumps(data)
 scope = data["scope"]
+print("Hello from eco_calculations.py")
 
 if scope == "proposed":
+    print("proposed")
     subprocess.run(['python3', 'routes/eco_calculations/proposed.py', serialized_data])
+    # proposed.start()
 elif scope == "proposed_refresh_compressor_rows_7_2":
     subprocess.run(['python3', 'routes/eco_calculations/proposed_refresh_compressor_rows_7_2.py', serialized_data])
 elif scope == "proposed_leaks":
@@ -23,6 +27,9 @@ elif scope == "proposed_filters":
     subprocess.run(['python3', 'routes/eco_calculations/proposed_filters.py', serialized_data])
 elif scope == "proposed_pressure":
     subprocess.run(['python3', 'routes/eco_calculations/proposed_pressure.py', serialized_data])
+elif scope == "proposed_update_op_stats":
+    print("proposed_update_op_stats")
+    subprocess.run(['python3', 'routes/eco_calculations/proposed_update_op_stats.py', serialized_data])
 
 elif scope == "compare_scenarios":
     subprocess.run(['python3', 'routes/eco_calculations/compare_scenarios.py', serialized_data])
@@ -42,6 +49,10 @@ elif scope == "baseline_compressors":
 elif scope == "baseline_filters":
     subprocess.run(['python3', 'routes/eco_calculations/baseline_filters.py', serialized_data])
 
+elif scope == "baseline_update_op_stats":
+    print("baseline_update_op_stats")
+    subprocess.run(['python3', 'routes/eco_calculations/baseline_update_op_stats.py', serialized_data])
+
 else:
-    print("Oh jeez")
+    print("eco_calculations.py cannot find the script you're looking for...", file=sys.stderr)
     sys.exit(1)

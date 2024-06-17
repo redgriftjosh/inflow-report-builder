@@ -13,11 +13,22 @@ def run_script(data, script):
     serialized_data = json.dumps(data)
     script_path = os.path.join('routes', script)
 
+    # Set the PYTHONPATH to the src directory
+    env = os.environ.copy()
+    src_path = os.path.abspath(os.path.dirname(__file__))
+    # env['PYTHONPATH'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    # src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    env['PYTHONPATH'] = src_path
+
+    print(f"Running script: {script_path}")
+    print(f"PYTHONPATH: {env['PYTHONPATH']}")
+
+
     # This one normally pushes all console error messages as a response to the post req
-    result = subprocess.run(['python3', script_path, serialized_data], text=True, stderr=subprocess.PIPE)
+    result = subprocess.run(['python3', script_path, serialized_data], text=True, stderr=subprocess.PIPE, env=env)
 
     # I wanted to see the errors in the console
-    # result = subprocess.run(['python3', script_path, serialized_data])
+    # result = subprocess.run(['python3', script_path, serialized_data], env=env)
 
     if result.returncode == 0:
         # If the script was successful, return the success message

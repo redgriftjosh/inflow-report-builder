@@ -1018,7 +1018,7 @@ def minutes_between_experimental(op_id, dev):
 
     return total_minutes, weekly_schedule
                 
-
+# Migrating to data_crunch_util.py filter_df_to_each_operating_period
 def experimental_operating_period(df, op_id, dev):
     op_json = get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
     time_ranges = op_json["response"]["time_range"] # List if time_range IDs
@@ -1099,6 +1099,16 @@ def get_pressure_csvs(report_id, pressure_ids, dev):
             sys.exit()
     return pressure_csvs
 
+# def data_crunch_csv_to_df(csv_url):
+#     response = requests.get(csv_url) # Step 2: Download the CSV file
+#     response.raise_for_status() # Check that the request was successful
+    
+#     csv_data = StringIO(response.text) # Convert CSV into text of some sort
+    
+#     df = pd.read_csv(csv_data, parse_dates=[1], date_format='%Y-%m-%d %H:%M:%S') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
+
+#     return df
+
 # converts a csv url into a dataframe
 def csv_to_df(csv_url):
     response = requests.get(csv_url) # Step 2: Download the CSV file
@@ -1112,6 +1122,7 @@ def csv_to_df(csv_url):
 
     return df
 
+# PHASING THIS OUT MOVING TO data_crunch_util.py
 # trim the df to be all synced up with other pressure csvs
 def trim_df(report_json, df, dev):
     try:
@@ -1134,6 +1145,7 @@ def trim_df(report_json, df, dev):
         patch_req("Report", report_id, body={"loading": f"We're having some trouble Trimming your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
+# PHASING THIS OUT MOVING TO data_crunch_util.py
 # Takes in a DataFrame and ouputs a dataframe with excluded time ranges from user input
 def exclude_from_df(df, report_json, dev):
     try:

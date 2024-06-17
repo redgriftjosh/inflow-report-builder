@@ -88,7 +88,7 @@ def get_proposed_things(scenario_json, report_id, dev):
         total_kwh_annuals.append(kwh_annual)
     
     avg_kws = sum(total_kwh_annuals) / total_hours
-
+    print(f"Proposed kw_demand: {sum(kw_demand_15mins)}")
     total_kwh_annual = sum(total_kwh_annuals)
     return avg_kws, total_kwh_annual, sum(kw_demand_15mins)
 
@@ -116,6 +116,7 @@ def get_baseline_things(scenario_json, report_id, dev):
         total_kwh_annuals.append(kwh_annual)
     
     avg_kws = sum(total_kwh_annuals) / total_hours
+    print(f"Baseline kw_demand: {sum(kw_demand_15mins)}")
 
     total_kwh_annual = sum(total_kwh_annuals)
     return avg_kws, total_kwh_annual, sum(kw_demand_15mins)
@@ -123,8 +124,16 @@ def get_baseline_things(scenario_json, report_id, dev):
 def getPaybackYears(dollars_per_yr, dev, scenario_json):
     scenario_end_values = scenario_json["response"]["scenario_end_values"]
     scenario_end_values_json = common_functions.get_req("scenario_end_values", scenario_end_values, dev)
-    incentive = scenario_end_values_json["response"]["incentive"]
-    incremental = scenario_end_values_json["response"]["incremental"]
+
+    try:
+        incentive = scenario_end_values_json["response"]["incentive"]
+    except:
+        incentive = 0
+    
+    try:
+        incremental = scenario_end_values_json["response"]["incremental"]
+    except:
+        incremental = 0
 
     paybackYears = (incremental - incentive) / dollars_per_yr
     return paybackYears

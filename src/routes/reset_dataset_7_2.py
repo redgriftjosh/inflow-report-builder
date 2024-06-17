@@ -79,4 +79,5 @@ def add_datasets_to_operating_periods(report_id, operation_period_ids, air_compr
         operation_body = {"dataset_7_2": dataset_ids}
 
         common_functions.patch_req("operation_period", operation_period_id, operation_body, dev)
+        print("Done reset_dataset_7_2.py")
 

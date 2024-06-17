@@ -59,9 +59,12 @@ def get_total_report_leak_cfm(report_id, dev):
     leak_json = common_functions.get_req("leak", leak_id, dev)
 
     leak_entry_ids = leak_json["response"]["leak_entry"]
-
+    print(f"leak_entry_ids: {leak_entry_ids}")
+    count = 0
     adjusted_cfms = []
     for entry in leak_entry_ids:
+        print(f"count: {count}")
+        count += 1
         leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
         fixed = leak_entry_json["response"]["fixed"]
         print(f"fixed - report: {fixed}")
@@ -70,7 +73,7 @@ def get_total_report_leak_cfm(report_id, dev):
             adjusted_cfm = leak_entry_json["response"]["adjusted_cfm"]
 
             adjusted_cfms.append(adjusted_cfm)
-    
+    sys.exit(0)
     total_report_leak_cfm = sum(adjusted_cfms)
 
     return total_report_leak_cfm
@@ -114,6 +117,7 @@ def get_op_ids(scenario_id, dev):
 
 def start():
     dev, report_id, scenario_id = get_payload()
+    print(f"Payload: {dev}, report_id: {report_id}, scenario_id: {scenario_id}")
     
     total_proposed_leak_cfm = get_total_proposed_leak_cfm(scenario_id, dev)
     print(f"total_proposed_leak_cfm: {total_proposed_leak_cfm}")
