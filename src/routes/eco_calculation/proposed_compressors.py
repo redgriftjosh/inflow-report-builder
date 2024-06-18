@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import baseline_global
+from eco_calculation import proposed_global
 import pandas as pd
 
 current = os.path.dirname(os.path.realpath(__file__))
@@ -79,7 +79,6 @@ def check_is_new(ac_id, dev):
     
     return False
 
-
 # Gets the corrosponding kw & acfm that was calculated in the report for this opration_periods compressor (Needs to be from section 7.2)
 # s_ for scenario & r_ for report to differentiate between the two variables
 def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
@@ -106,9 +105,14 @@ def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
                 if r_ac_name == s_ac_name:
                     r_kw = r_dataset_json["response"]["kw"]
                     r_acfm = r_dataset_json["response"]["acfm"]
+                    if r_acfm == 0:
+                        # return 0
+                        print(f"ACFM can't be 0 for {r_ac_name} in {r_op_name} in {report_id}", file=sys.stderr)
+                        sys.exit(1)
 
                     # Calculate and return kw/cfm should be like a decimal aroun 0.3
                     return r_kw / r_acfm
+
 
 def get_peak_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
     s_op_name = s_op_json["response"]["Name"]
@@ -214,7 +218,7 @@ def get_op_report_max_ac_kw(report_id, op_name, dev):
                 max_kws.append(max_kw)
             
             return sum(max_kws)
-    
+
 
 def get_pressure_change(op_json, dev):
     try:
@@ -228,98 +232,99 @@ def get_pressure_change(op_json, dev):
         return 0
 
 def start():
-    show_calculations = {
-        'script': 'proposed_compressors.py',
-    }
-    print(f"getting started baseline_compressors.py")
+    # show_calculations = {
+    #     'script': 'proposed_compressors.py',
+    # }
+    print(f"getting started proposed_compressors.py")
     dev, report_id, scenario_id = get_payload()
     print(f"report_id: {report_id}, dev: {dev}, scenario_id: {scenario_id}")
     
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
+    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
 
-    ac_ids = scenario_baseline_json["response"]["air_compressor"]
-    operating_period_ids = scenario_baseline_json["response"]["operation_period"]
+    ac_ids = scenario_proposed_json["response"]["air_compressor"]
+    operating_period_ids = scenario_proposed_json["response"]["operation_period"]
+    
 
 
-    for operating_period_id in operating_period_ids:
+    for idx, operating_period_id in enumerate(operating_period_ids):
         avg_kws = []
         max_kws = []
         
         op_json = common_functions.get_req("operation_period", operating_period_id, dev)
 
         op_name = op_json["response"]["Name"]
-        show_calculations['Operation Period'] = op_name
+        # show_calculations[f'Operation Period{idx+1}'] = str(op_name)
 
         # Get's the average header pressure in report. Will be something like "107.422313453"
         pressure = get_pressure_index(report_id, op_json, dev)
-        show_calculations["header Pressure"] = pressure
+        # show_calculations["header Pressure"] = pressure
 
         # Looks at average pressure change from filters. pressure_change will be something like "-3.21"
         pressure_change = get_pressure_change(op_json, dev)
-        show_calculations["pressure Change"] = pressure_change
-        
-        gal_per_cfm = common_functions.get_gal_per_cfm(ac_ids, report_id, dev)
-        show_calculations["gal/cfm"] = gal_per_cfm
+        # show_calculations["pressure Change"] = pressure_change
 
+        gal_per_cfm = common_functions.get_gal_per_cfm(ac_ids, report_id, dev)
+        # show_calculations["gal/cfm"] = gal_per_cfm
         for ac in ac_ids:
             ac_json = common_functions.get_req("air_compressor", ac, dev)
             ac_name = ac_json["response"]["Customer CA"]
 
             # Determine if the entered compressor is a new compressor
             is_new = check_is_new(ac, dev)
-            show_calculations[f'{ac_name} Is A New Compressor?'] = is_new
-
+            # show_calculations[f'{ac_name} Is A New Compressor?'] = is_new
+            
             if is_new == True:
                 kw_per_cfm = None
-                show_calculations[f'{ac_name} kW/CFM'] = "N/A Because you're recommending a new compressor"
+                # show_calculations[f'{ac_name} kW/CFM'] = "N/A Because you're recommending a new compressor"
                 peak_kw_per_cfm = None
-                show_calculations[f'{ac_name} Peak kW/CFM'] = "N/A Because you're recommending a new compressor"
+                # show_calculations[f'{ac_name} Peak kW/CFM'] = "N/A Because you're recommending a new compressor"
             else:
                 # Get kw/cfm kpi so we can calculate the new kW if it's the same compressor
                 kw_per_cfm = get_kw_per_cfm(report_id, ac_name, op_json, dev)
-                show_calculations[f'{ac_name} kW/CFM'] = kw_per_cfm
+                # show_calculations[f'{ac_name} kW/CFM'] = kw_per_cfm
                 peak_kw_per_cfm = get_peak_kw_per_cfm(report_id, ac_name, op_json, dev)
-                show_calculations[f'{ac_name} Peak kW/CFM'] = peak_kw_per_cfm
+                # show_calculations[f'{ac_name} Peak kW/CFM'] = peak_kw_per_cfm
 
             acfm = get_acfm_entered(op_json, ac, dev)
             peak_acfm = get_peak_acfm_entered(op_json, ac, dev)
-
+            
             # Entered in from filters changed
             avg_psi_drop, peak_psi_drop = get_psi_drop_entered(op_json, ac, dev)
-
+            print(5)
             # Using average ACFM
             avg_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, is_peak=False, dev=dev)
             avg_kw = avg_kw + avg_kw * (avg_psi_drop * 0.005)
             avg_kws.append(avg_kw)
-
+            print(6)
             # Using peak ACFM
             max_kw = common_functions.calculate_kw_from_flow(ac, report_id, pressure, pressure_change, peak_acfm, peak_kw_per_cfm, is_new, gal_per_cfm, is_peak=True, dev=dev)
             max_kw = max_kw + max_kw * (peak_psi_drop * 0.005)
             print(f"ac_name: {ac_name}, avg_kw: {avg_kw}, max_kw: {max_kw}")
-            show_calculations[f'{ac_name} Average kW'] = avg_kw
-            show_calculations[f'{ac_name} Peak 15 Min kW'] = max_kw
+            # show_calculations[f'{ac_name} Average kW'] = avg_kw
+            # show_calculations[f'{ac_name} Peak 15 Min kW'] = max_kw
             max_kws.append(max_kw)
+            
         
         # New Calculated Values
         op_avg_kw = sum(avg_kws)
         op_max_kw = sum(max_kws)
-
+        
 
         # Report / Original Values
         report_op_kw = get_op_report_ac_kw(report_id, op_name, dev)
         report_op_max_kw = get_op_report_max_ac_kw(report_id, op_name, dev)
-
+        
         # Calculate difference
         avg_kw_change = op_avg_kw - report_op_kw
         peak_kw_change = op_max_kw - report_op_max_kw
-
+        
         print("")
         print(f"avg_kw_change: {avg_kw_change}")
-        show_calculations[f'The Change in Average kW'] = avg_kw_change
+        # show_calculations[f'The Change in Average kW'] = avg_kw_change
         print(f"peak_kw_change: {peak_kw_change}")
-        show_calculations[f'The Change in Peak 15 Min kW'] = peak_kw_change
+        # show_calculations[f'The Change in Peak 15 Min kW'] = peak_kw_change
 
         operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
         try:
@@ -327,10 +332,11 @@ def start():
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        show_calculations = json.dumps(show_calculations)
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": avg_kw_change, "compressor_peak_kw_change": peak_kw_change, "show_calculations": show_calculations}, dev=dev)
+        # show_calculations = json.dumps(show_calculations)
+        common_functions.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": avg_kw_change, "compressor_peak_kw_change": peak_kw_change}, dev=dev)
 
-        baseline_global.update_op_stats(operating_period_id, report_id, dev)
+        proposed_global.update_op_stats(operating_period_id, report_id, dev)
 
 
-start()
+if __name__ == "__main__":
+    start()

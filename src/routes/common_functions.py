@@ -11,6 +11,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import re
+from utilities import compressor_util
 
 
 def clean_json(my_json, processed_ids=None, additional_keys=None):
@@ -751,13 +752,15 @@ def get_gal_per_cfm(ac_ids, report_id, dev):
             
             cfm = max(slope_cfms)
             cfms.append(cfm)
-    
     total_cfm = sum(cfms)
 
     report_json = get_req("report", report_id, dev)
 
-    storage_ids = report_json["response"]["storage_tank"] # SHOULD BE GETTING THESE FROM BASELINE 
-
+    try:
+        storage_ids = report_json["response"]["storage_tank"] # SHOULD BE GETTING THESE FROM BASELINE 
+    except:
+        print(f"Can't find any Storage Tank info!", file=sys.stderr)
+        sys.exit(1)
     sizes = []
 
     for storage_id in storage_ids:
@@ -1496,16 +1499,8 @@ def compile_master_df(report_id, dev):
         else:
             patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
-        
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
         
         # if "CFM" in ac_json["response"]:
         #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs

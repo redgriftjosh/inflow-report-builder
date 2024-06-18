@@ -1,9 +1,10 @@
 import os
 import sys
 import json
-import baseline_global
+from eco_calculation import proposed_global
 import pandas as pd
 import numpy as np
+from utilities import compressor_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -160,15 +161,8 @@ def get_cfm_df(report_json, ac_ids, dev):
             # patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                # patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
         
         # if "CFM" in ac_json["response"]:
         #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
@@ -230,14 +224,14 @@ def calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm):
 
     return slope * acfm + intercept
 
-def get_total_baseline_dryer_kw(report_id, scenario_id, dev):
+def get_total_proposed_dryer_kw(report_id, scenario_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
     
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
-    dryer_ids = scenario_baseline_json["response"]["dryer"]
+    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    dryer_ids = scenario_proposed_json["response"]["dryer"]
 
     kws = []
     for dryer_id in dryer_ids:
@@ -267,6 +261,7 @@ def get_total_baseline_dryer_kw(report_id, scenario_id, dev):
             df = get_cfm_df(report_json, ac_ids, dev)
             df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json))
             kw = df["Kilowatts"].mean()
+
         # if control == "Cycling":
         #     df = get_cfm_df(report_json, ac_ids, dev)
         #     df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
@@ -296,14 +291,14 @@ def get_cfm_loss_dpd(acfm, capacity_scfm, type):
         cfm_loss = 0
         return cfm_loss
 
-def get_total_baseline_dryer_cfm(report_id, scenario_id, dev):
+def get_total_proposed_dryer_cfm(report_id, scenario_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
 
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
-    dryer_ids = scenario_baseline_json["response"]["dryer"]
+    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    dryer_ids = scenario_proposed_json["response"]["dryer"]
 
     adjusted_cfms = []
     for dryer_id in dryer_ids:
@@ -322,22 +317,22 @@ def get_total_baseline_dryer_cfm(report_id, scenario_id, dev):
         else:
             cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
 
-        # cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
+        #cfm_loss = get_dryer_cfm_loss(capacity_scfm, type)
 
         adjusted_cfms.append(cfm_loss)
     
-    total_baseline_dryer_cfm = sum(adjusted_cfms)
+    total_proposed_dryer_cfm = sum(adjusted_cfms)
 
-    return total_baseline_dryer_cfm
+    return total_proposed_dryer_cfm
 
 def get_op_ids(scenario_id, dev):
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
 
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
 
-    operating_period_ids = scenario_baseline_json["response"]["operation_period"]
+    operating_period_ids = scenario_proposed_json["response"]["operation_period"]
 
     return operating_period_ids
 
@@ -392,6 +387,7 @@ def get_total_report_dryer_kw(report_id, dev):
 
         ac_ids = get_ac_ids_for_dryer(report_json, connected_to, dev)
 
+        # Just copied from baseline_7_1.py (not eco)
         if control == "Cycling":
             df = get_cfm_df(report_json, ac_ids, dev)
             df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
@@ -408,6 +404,7 @@ def get_total_report_dryer_kw(report_id, dev):
             df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json))
             kw = df["Kilowatts"].mean()
 
+        # Old code because I'm a code hoarder hehe rawr xD
         # if control == "Cycling":
         #     df = get_cfm_df(report_json, ac_ids, dev)
         #     df[f"Kilowatts"] = df.filter(like='ACFM').sum(axis=1).apply(lambda acfm: calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm))
@@ -424,19 +421,19 @@ def get_total_report_dryer_kw(report_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
     
-    total_baseline_dryer_cfm = get_total_baseline_dryer_cfm(report_id, scenario_id, dev)
-    total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev)
+    total_proposed_dryer_cfm = get_total_proposed_dryer_cfm(report_id, scenario_id, dev) 
+    total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev) # Just grabs SCFM Loss from the report
 
-    total_dryer_cfm = total_baseline_dryer_cfm - total_report_dryer_cfm
+    total_dryer_cfm = total_proposed_dryer_cfm - total_report_dryer_cfm
 
 
-    total_baseline_dryer_kw = get_total_baseline_dryer_kw(report_id, scenario_id, dev)
-    print(f"total_baseline_dryer_kw: {total_baseline_dryer_kw}")
+    total_proposed_dryer_kw = get_total_proposed_dryer_kw(report_id, scenario_id, dev)
+    print(f"total_proposed_dryer_kw: {total_proposed_dryer_kw}")
 
     total_report_dryer_kw = get_total_report_dryer_kw(report_id, dev)
     print(f"total_report_dryer_kw: {total_report_dryer_kw}")
 
-    total_dryer_kw = total_baseline_dryer_kw - total_report_dryer_kw
+    total_dryer_kw = total_proposed_dryer_kw - total_report_dryer_kw
     print(f"total_dryer_kw: {total_dryer_kw}")
 
 
@@ -451,7 +448,8 @@ def start():
 
         common_functions.patch_req("scenario_differences", scenario_differences, body={"dryer_cfm_change": total_dryer_cfm, "dryer_kw_change": total_dryer_kw}, dev=dev)
 
-        baseline_global.update_op_stats(operating_period_id, report_id, dev)
+        proposed_global.update_op_stats(operating_period_id, report_id, dev)
 
 
-start()
+if __name__ == "__main__":
+    start()

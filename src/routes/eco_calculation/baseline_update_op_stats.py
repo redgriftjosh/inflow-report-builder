@@ -1,8 +1,6 @@
 import json
 import sys
-import baseline_global
-
-print("baseline_update_op_stats.py")
+from eco_calculation import baseline_global
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -31,6 +29,11 @@ def get_payload():
 
     return dev, report_id, op_id
 
-dev, report_id, op_id = get_payload()
+def start():
+    print("baseline_update_op_stats.py")
+    dev, report_id, op_id = get_payload()
 
-baseline_global.update_op_stats(op_id, report_id, dev)
+    baseline_global.update_op_stats(op_id, report_id, dev)
+
+if __name__ == "__main__":
+    start()

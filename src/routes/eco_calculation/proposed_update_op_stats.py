@@ -1,8 +1,6 @@
 import json
 import sys
-import proposed_global
-
-print("proposed_update_op_stats.py")
+from eco_calculation import proposed_global
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -31,6 +29,10 @@ def get_payload():
 
     return dev, report_id, op_id
 
-dev, report_id, op_id = get_payload()
+def start():
+    dev, report_id, op_id = get_payload()
 
-proposed_global.update_op_stats(op_id, report_id, dev)
+    proposed_global.update_op_stats(op_id, report_id, dev)
+
+# if __name__ == "__main__":
+#     start()

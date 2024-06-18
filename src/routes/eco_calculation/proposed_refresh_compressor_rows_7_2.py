@@ -2,7 +2,7 @@ import sys
 import json
 from datetime import datetime, timedelta
 import os
-import baseline_7_1
+from eco_calculation import proposed_7_1
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -102,11 +102,11 @@ def start():
     dev, report_id, scenario_id = get_payload()
 
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
-    operation_period_ids = scenario_baseline_json["response"]["operation_period"]
-    air_compressor_ids = scenario_baseline_json["response"]["air_compressor"]
+    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    operation_period_ids = scenario_proposed_json["response"]["operation_period"]
+    air_compressor_ids = scenario_proposed_json["response"]["air_compressor"]
     
     common_functions.patch_req("Report", report_id, body={"loading": "Deleting the chart data incase Air Compressors or Operating Periods have changed...", "is_loading_error": "no"}, dev=dev)
     delete_datasets_7_2(report_id, operation_period_ids, dev)
@@ -117,4 +117,5 @@ def start():
 
 
 
-start()
+# if __name__ == "__main__":
+#     start()

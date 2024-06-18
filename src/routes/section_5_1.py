@@ -9,6 +9,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import requests
+from utilities import compressor_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -131,15 +132,8 @@ def get_df(dev, report_id):
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
         df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
         
         current_name_date = df.columns[1]

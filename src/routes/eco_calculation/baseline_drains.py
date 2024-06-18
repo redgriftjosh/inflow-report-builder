@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import baseline_global
+from eco_calculation import baseline_global
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)

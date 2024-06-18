@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import proposed_global
+from eco_calculation import proposed_global
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -136,4 +136,5 @@ def start():
 
 
 
-start()
+if __name__ == "__main__":
+    start()

@@ -8,6 +8,7 @@ import requests
 import common_functions
 import plotly.graph_objects as go
 import numpy as np
+from utilities import compressor_util
 
 def add_header_pressure_to_master_df(master_df, report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
@@ -122,15 +123,8 @@ def compile_df(report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
 
         df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
         

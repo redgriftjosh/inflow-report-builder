@@ -2,7 +2,7 @@ import sys
 import json
 import common_functions
 import reset_dataset_7_2
-from utilities import data_crunch_util
+from utilities import data_crunch_util, compressor_util
 # import common_functions 
 
 
@@ -26,14 +26,7 @@ def calculate_values(df, operating_period_id, report_json, dev):
             sys.exit(1)
 
         # Get the CFM
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-            else:
-                print(f"Missing CFM! Air Compressor: {ac_name}", file=sys.stderr)
-                sys.exit(1)
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
 
         avg_kilowatts = df[f"Kilowatts{idx+1}"].mean()
         acfm = df[f"ACFM{idx+1}"].mean()
@@ -113,5 +106,5 @@ def start():
     loop_through_operating_periods(report_id, report_json, dev)
     common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
     start()

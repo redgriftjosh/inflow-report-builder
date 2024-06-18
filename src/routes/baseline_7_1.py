@@ -4,8 +4,7 @@ import common_functions
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from utilities import data_crunch_util
-from utilities import financial_util
+from utilities import data_crunch_util, financial_util, compressor_util
 
 
 
@@ -272,15 +271,8 @@ def get_cfm_df(report_json, ac_ids, dev):
             # patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                # patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
-                sys.exit()
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
         
         # if "CFM" in ac_json["response"]:
         #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs

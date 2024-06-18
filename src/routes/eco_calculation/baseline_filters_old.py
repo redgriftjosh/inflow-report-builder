@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import baseline_global
+from eco_calculation import baseline_global
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -36,15 +36,7 @@ def get_payload():
     return dev, report_id, scenario_id
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={
-        "operation_period": op_id, 
-        "compressor_kw_change": 0,
-        "dryer_kw_change": 0,
-        "drain_cfm_change": 0,
-        "dryer_cfm_change": 0,
-        "filter_psi_change": 0,
-        "leak_cfm_change": 0
-        }, dev=dev)
+    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
     scenario_difference = response["id"]
 
@@ -52,54 +44,38 @@ def create_new_scenario_difference(op_id, dev):
 
     return scenario_difference
 
-def get_total_report_leak_cfm(report_id, dev):
+def get_total_report_filter_psi_drop(report_id, dev):
     report_json = common_functions.get_req("report", report_id, dev)
-    leak_id = report_json["response"]["leak"]
+    filter_ids = report_json["response"]["filter"]
 
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    psi_drops = []
+    for filter_id in filter_ids:
+        filter_json = common_functions.get_req("filter", filter_id, dev)
+        psi_drop = filter_json["response"]["psig_drop"]
 
-    leak_entry_ids = leak_json["response"]["leak_entry"]
+        psi_drops.append(psi_drop)
 
-    adjusted_cfms = []
-    for entry in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
-        fixed = leak_entry_json["response"]["fixed"]
-        print(f"fixed - report: {fixed}")
+    total_psi_drop = sum(psi_drops)
 
-        if fixed == False:
-            adjusted_cfm = leak_entry_json["response"]["adjusted_cfm"]
+    return total_psi_drop
 
-            adjusted_cfms.append(adjusted_cfm)
-    
-    total_report_leak_cfm = sum(adjusted_cfms)
-
-    return total_report_leak_cfm
-
-def get_total_baseline_leak_cfm(scenario_id, dev):
+def get_total_baseline_filter_psi_drop(scenario_id, dev):
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
     scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
     scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
-    leak_id = scenario_baseline_json["response"]["leak"]
+    filter_ids = scenario_baseline_json["response"]["filter"]
 
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    psi_drops = []
+    for filter_id in filter_ids:
+        filter_json = common_functions.get_req("filter", filter_id, dev)
+        psi_drop = filter_json["response"]["psig_drop"]
 
-    leak_entry_ids = leak_json["response"]["leak_entry"]
-
-    adjusted_cfms = []
-    for entry in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
-        fixed = leak_entry_json["response"]["fixed"]
-        print(f"fixed - baseline: {fixed}")
-
-        if fixed == False:
-            adjusted_cfm = leak_entry_json["response"]["adjusted_cfm"]
-
-            adjusted_cfms.append(adjusted_cfm)
+        psi_drops.append(psi_drop)
     
-    total_baseline_leak_cfm = sum(adjusted_cfms)
+    total_baseline_filter_psi_drop = sum(psi_drops)
 
-    return total_baseline_leak_cfm
+    return total_baseline_filter_psi_drop
 
 def get_op_ids(scenario_id, dev):
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
@@ -115,14 +91,10 @@ def get_op_ids(scenario_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
     
-    total_baseline_leak_cfm = get_total_baseline_leak_cfm(scenario_id, dev)
-    print(f"total_baseline_leak_cfm: {total_baseline_leak_cfm}")
+    total_baseline_filter_psi_drop = get_total_baseline_filter_psi_drop(scenario_id, dev)
+    total_report_filter_psi_drop = get_total_report_filter_psi_drop(report_id, dev)
 
-    total_report_leak_cfm = get_total_report_leak_cfm(report_id, dev)
-    print(f"total_report_leak_cfm: {total_report_leak_cfm}")
-
-    total_leak_cfm = total_baseline_leak_cfm - total_report_leak_cfm
-    print(f"total_leak_cfm: {total_leak_cfm}")
+    total_filter_psi_drop = total_baseline_filter_psi_drop - total_report_filter_psi_drop
 
     operating_period_ids = get_op_ids(scenario_id, dev)
 
@@ -133,7 +105,7 @@ def start():
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"leak_cfm_change": total_leak_cfm}, dev=dev)
+        common_functions.patch_req("scenario_differences", scenario_differences, body={"filter_psi_change": total_filter_psi_drop}, dev=dev)
 
         baseline_global.update_op_stats(operating_period_id, report_id, dev)
 

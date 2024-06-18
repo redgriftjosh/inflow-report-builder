@@ -1,22 +1,20 @@
-import sys, os
+import sys
 from datetime import datetime, timedelta
-print("Hello from proposed_7_1.py2")
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+import os
 from utilities import baseline_proposed_7_1_util
-print("Hello from proposed_7_1.py3")
+
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
 sys.path.append(parent)
 import common_functions
 
-
 def get_baseline_operation_7_1_id(scenario_id, dev):
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
+    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
 
-    baseline_operation_7_1_id = scenario_proposed_json["response"]["baseline_operation_7_1"]
+    baseline_operation_7_1_id = scenario_baseline_json["response"]["baseline_operation_7_1"]
 
     return baseline_operation_7_1_id
 
@@ -38,10 +36,10 @@ def get_scenario_demand_schedule_id(report_id, scenario_id, dev):
     op_name = report_demand_schedule_json["response"]["Name"]
 
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
 
-    op_ids = scenario_proposed_json["response"]["operation_period"]
+    op_ids = scenario_baseline_json["response"]["operation_period"]
 
     for op_id in op_ids:
         op_json = common_functions.get_req("operation_period", op_id, dev)
@@ -54,12 +52,12 @@ def check_dependencies(report_id, scenario_id, dev):
     common_functions.patch_req("Report", report_id, body={"loading": f"Checking Dependencies...", "is_loading_error": "no"}, dev=dev)
     report_json = common_functions.get_req("report", report_id, dev)
     scenario_json = common_functions.get_req("scenario", scenario_id, dev)
-    scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
+    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
 
     # Checking if we have at least one operation period
     try:
-        operation_period_ids = scenario_proposed_json["response"]["operation_period"] 
+        operation_period_ids = scenario_baseline_json["response"]["operation_period"] 
     except:
         print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
         sys.exit(1)
@@ -94,10 +92,13 @@ def reset_rows(baseline_operation_7_1, report_id, report_json, dev):
     return baseline_operation_7_1
 
 def start(dev, report_id, scenario_id, scope):
-    print("Hello from proposed_7_1.py")
+    print("starting baseline 7.1")
 
     operation_period_ids, report_json, baseline_operation_7_1, demand_schedule_id = check_dependencies(report_id, scenario_id, dev)
 
     baseline_operation_7_1 = reset_rows(baseline_operation_7_1, report_id, report_json, dev)
-    # start_calculations(operation_period_ids, report_json, baseline_operation_7_1, scenario_id, demand_schedule_id, dev)
+
     baseline_proposed_7_1_util.start_calculations(operation_period_ids, demand_schedule_id, report_json, baseline_operation_7_1, dev, scope)
+
+if __name__ == "__main__":
+    start()

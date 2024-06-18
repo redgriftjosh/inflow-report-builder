@@ -1,7 +1,7 @@
 import os
 import sys
 import json
-import proposed_global
+from eco_calculation import proposed_global
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -142,4 +142,5 @@ def start():
         proposed_global.update_op_stats(operating_period_id, report_id, dev)
 
 
-start()
+if __name__ == "__main__":
+    start()

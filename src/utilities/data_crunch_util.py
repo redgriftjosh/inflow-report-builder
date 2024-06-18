@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 import requests
 from routes import common_functions
-from utilities import requests_util
+from utilities import requests_util, compressor_util
 
 # Fetches the CSV data from the given URL and returns a pandas DataFrame
 def data_crunch_csv_to_df(csv_url):
@@ -184,16 +184,8 @@ def generate_raw_data_crunch(dev, report_id):
         else:
             print(f"Missing Control Type! Air Compressor: {ac_name}", file=sys.stderr)
             sys.exit(1)
-        
-        if control == "Fixed Speed - Variable Capacity":
-            cfm = 1
-        else:
-            if "CFM" in ac_json["response"]:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            else:
-                print(f"Missing CFM! Air Compressor: {ac_name}", file=sys.stderr)
-                sys.exit(1)
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
+        cfms.append(cfm)
 
         df = common_functions.calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_id)
         df[f'15_Min_Avg_Flow_AC{idx+1}'] = df[f'ACFM{idx+1}'][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0)

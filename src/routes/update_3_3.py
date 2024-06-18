@@ -1,7 +1,7 @@
 import common_functions
 import sys
 import json
-import requests
+from utilities import compressor_util
 
 
 def get_payload():
@@ -16,23 +16,23 @@ def get_payload():
 
     return dev, report_id
 
-def get_max_cfm_from_slopes(ac_json, ac_name, dev):
-    try:
-        slope_ids = ac_json["response"]["vfd_slope_entries"]
-    except:
-        print(f"Missing Slope Entries!: {ac_name}", file=sys.stderr)
-        sys.exit(1)
+# def get_max_cfm_from_slopes(ac_json, ac_name, dev):
+#     try:
+#         slope_ids = ac_json["response"]["vfd_slope_entries"]
+#     except:
+#         print(f"Missing Slope Entries!: {ac_name}", file=sys.stderr)
+#         sys.exit(1)
     
-    slope_cfms = []
-    for slope in slope_ids:
-        slope_json = common_functions.get_req("vfd_slope_entries", slope, dev)
-        try:
-            slope_cfms.append(slope_json["response"]["capacity-acfm"])
-        except:
-            print(f"Missing Slope Data: {ac_name}", file=sys.stderr)
-            sys.exit(1)
+#     slope_cfms = []
+#     for slope in slope_ids:
+#         slope_json = common_functions.get_req("vfd_slope_entries", slope, dev)
+#         try:
+#             slope_cfms.append(slope_json["response"]["capacity-acfm"])
+#         except:
+#             print(f"Missing Slope Data: {ac_name}", file=sys.stderr)
+#             sys.exit(1)
     
-    return max(slope_cfms)
+#     return max(slope_cfms)
 
 
 def get_cfms(report_id, dev):
@@ -58,16 +58,18 @@ def get_cfms(report_id, dev):
         except:
             print(f"Missing Control Type! Air Compressor: {ac_name}", file=sys.stderr)
             sys.exit(1)
+        
+        cfms.append(compressor_util.get_cfm(control, ac_json, ac_name, dev))
 
-        if control == "Fixed Speed - Variable Capacity":
-            cfms.append(get_max_cfm_from_slopes(ac_json, ac_name, dev))
-        else:
-            try:
-                cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-                cfms.append(cfm)
-            except:
-                print(f"Missing CFM! Air Compressor: {ac_name}", file=sys.stderr)
-                sys.exit(1)
+        # if control == "Fixed Speed - Variable Capacity":
+        #     cfms.append(get_max_cfm_from_slopes(ac_json, ac_name, dev))
+        # else:
+        #     try:
+        #         cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
+        #         cfms.append(cfm)
+        #     except:
+        #         print(f"Missing CFM! Air Compressor: {ac_name}", file=sys.stderr)
+        #         sys.exit(1)
 
     return cfms
 
