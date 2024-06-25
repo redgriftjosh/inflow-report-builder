@@ -81,7 +81,10 @@ def get_proposed_things(scenario_json, report_id, dev):
         proposed_operation_7_1_row_json = common_functions.get_req("baseline_operation_7_1_row", proposed_operation_7_1_row, dev)
         average_kw_demand = proposed_operation_7_1_row_json["response"]["average_kw_demand"]
         kwh_annual = proposed_operation_7_1_row_json["response"]["kwh_annual"]
-        kw_demand_15min = proposed_operation_7_1_row_json["response"]["kw_demand_15min"]
+        try:
+            kw_demand_15min = proposed_operation_7_1_row_json["response"]["kw_demand_15min"]
+        except:
+            kw_demand_15min = 0
 
         kw_demand_15mins.append(kw_demand_15min)
         total_cost_kws.append(average_kw_demand)
@@ -109,7 +112,10 @@ def get_baseline_things(scenario_json, report_id, dev):
         baseline_operation_7_1_row_json = common_functions.get_req("baseline_operation_7_1_row", baseline_operation_7_1_row, dev)
         average_kw_demand = baseline_operation_7_1_row_json["response"]["average_kw_demand"]
         kwh_annual = baseline_operation_7_1_row_json["response"]["kwh_annual"]
-        kw_demand_15min = baseline_operation_7_1_row_json["response"]["kw_demand_15min"]
+        try:
+            kw_demand_15min = baseline_operation_7_1_row_json["response"]["kw_demand_15min"]
+        except:
+            kw_demand_15min = 0
 
         kw_demand_15mins.append(kw_demand_15min)
         total_cost_kws.append(average_kw_demand)

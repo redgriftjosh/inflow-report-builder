@@ -422,6 +422,7 @@ def start():
     total_report_dryer_cfm = get_total_report_dryer_cfm(report_id, dev)
 
     total_dryer_cfm = total_baseline_dryer_cfm - total_report_dryer_cfm
+    total_dryer_cfm = round(total_dryer_cfm, 8)
 
 
     total_baseline_dryer_kw = get_total_baseline_dryer_kw(report_id, scenario_id, dev)
@@ -431,6 +432,7 @@ def start():
     print(f"total_report_dryer_kw: {total_report_dryer_kw}")
 
     total_dryer_kw = total_baseline_dryer_kw - total_report_dryer_kw
+    total_dryer_kw = round(total_dryer_kw, 8)
     print(f"total_dryer_kw: {total_dryer_kw}")
 
 

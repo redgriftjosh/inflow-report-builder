@@ -35,7 +35,7 @@ def calculate_values(df, operating_period_id, report_json, dev):
         peak_15_acfm_index = df['15_Min_Avg_Flow'].idxmax() # Get the index of the max TOTAL peak 15 minute average flow
         peak_15_acfm = df.at[peak_15_acfm_index, f"15_Min_Avg_Flow_AC{idx+1}"]
         peak_15_kw_index = df['15_Min_Avg_kW'].idxmax() # Get the index of the max TOTAL peak 15 minute average kW
-        peak_15_kw = df.at[peak_15_kw_index, f"15_Min_Avg_kW_AC{idx+1}"]
+        peak_15_kw = df.at[peak_15_acfm_index, f"15_Min_Avg_kW_AC{idx+1}"]
         peak_15_flow_percent = (peak_15_acfm/cfm) * 100
 
         peak_2_acfm_index = df['2_Min_Avg_Flow'].idxmax() # Get the index of the max TOTAL peak 15 minute average flow
@@ -43,7 +43,10 @@ def calculate_values(df, operating_period_id, report_json, dev):
         peak_2_kw_index = df['2_Min_Avg_kW'].idxmax() # Get the index of the max TOTAL peak 15 minute average kW
         peak_2_kw = df.at[peak_2_kw_index, f"2_Min_Avg_kW_AC{idx+1}"]
         peak_2_flow_percent = (peak_2_acfm/cfm) * 100
-
+        print("")
+        print(f"peak_15_acfm: {peak_15_acfm}")
+        print(f"cfm: {cfm}")
+        print(f"peak_15_flow_percent: {peak_15_flow_percent}")
         print("")
         print(f"AC{idx+1}")
         print(f"peak_15_acfm_index: {peak_15_acfm_index}")

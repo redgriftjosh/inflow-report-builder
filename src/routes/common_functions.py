@@ -583,18 +583,25 @@ def sum_product(idle_time, standby_time, standby_power, off_time, idle_kw, max_k
     products.append(idle_kw * (idle_time / 100))
     products.append(((standby_power / 100) * max_kw) * (standby_time / 100)) # User defined percent of max kw times percent of time
     products.append(0 * (off_time / 100))
+
     return sum(products)
 
 def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw_per_cfm, is_new, gal_per_cfm, is_peak, dev):
-    
+    print(f"pressure: {pressure}")
+    print(f"pressure_change: {pressure_change}")
     try:
         pressure_correct = pressure + pressure_change
         psi_percent = 1-((pressure-pressure_correct)*0.005)
     except:
         psi_percent = 1
 
+
+
     if is_new != True:
         print(f"kw for {ac_id}: {(acfm * kw_per_cfm) * psi_percent}")
+        print(f"acfm {acfm}")
+        print(f"kw_per_cfm {kw_per_cfm}")
+        print(f"psi_percent {psi_percent}")
         return (acfm * kw_per_cfm) * psi_percent
 
     ac_json = get_req("air_compressor", ac_id, dev)
@@ -709,12 +716,15 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw
     
     elif control == "Fixed Speed - Variable Capacity":
         pf = ac_json["response"]["pf"]
+        volts = ac_json["response"]["volts"]
 
         a, b, c = get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pressure, dev)
 
         max_kw = get_max_kw_vfd(ac_json, report_id, dev)
+        print(f"Max KW: {max_kw} for: {ac_name}")
 
-        amps = acfm * slope + intercept
+        # amps = acfm * slope + intercept
+        amps = (a * (acfm * acfm) + b * acfm + c)
         idle_kw = (amps * sqrt(3) * pf * volts) / 1000
 
         return sum_product(idle_time, standby_time, standby_power, off_time, idle_kw, max_kw)

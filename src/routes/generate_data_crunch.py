@@ -131,15 +131,15 @@ def add_pressure_to_master_df(master_df, report_id, dev):
 
 def generate_data_crunch(dev, report_id):
     df = data_crunch_util.generate_raw_data_crunch(dev, report_id)
-
+    df.to_csv("raw_data_crunch.csv")
     upload_raw_data_crunch(df, report_id, dev)
 
     df = data_crunch_util.trim_df(report_id, df, dev)
-
+    df.to_csv("trim_df.csv")
     upload_trimmed_data_crunch(df, report_id, dev)
 
     df = data_crunch_util.exclude_from_df(report_id, df, dev)
-
+    df.to_csv("trim_df.csv")
     upload_exluded_data_crunch(df, report_id, dev)
 
     report_json = common_functions.get_req("report", report_id, dev)
@@ -156,7 +156,11 @@ def generate_data_crunch(dev, report_id):
 
     if op_per_type == "Experimental":
         for operating_period_id in operating_period_ids:
+            op_json = requests_util.get_req("operation_period", operating_period_id, dev)
+            op_name = op_json["response"]["Name"]
+
             period_data = data_crunch_util.filter_df_to_each_operating_period(df, operating_period_id, dev)
+            period_data.to_csv(f"{op_name}_data_crunch.csv")
 
             upload_op_data_crunch(period_data, report_id, operating_period_id, dev)
             

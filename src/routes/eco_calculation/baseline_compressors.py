@@ -79,7 +79,6 @@ def check_is_new(ac_id, dev):
     
     return False
 
-
 # Gets the corrosponding kw & acfm that was calculated in the report for this opration_periods compressor (Needs to be from section 7.2)
 # s_ for scenario & r_ for report to differentiate between the two variables
 def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
@@ -99,7 +98,11 @@ def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
             # Go through all the datasets in the report section 7.2 and find the one that matches the Air Compressor we want
             for r_dataset_id in r_dataset_ids:
                 r_dataset_json = common_functions.get_req("dataset_7_2", r_dataset_id, dev)
-                r_ac_id = r_dataset_json["response"]["air_compressor"]
+                try:
+                    r_ac_id = r_dataset_json["response"]["air_compressor"]
+                except:
+                    print(f"Couldn't find the data in section 7.2. If you cloned this report, try re-running section 7.2 and then come back and run this one again.", file=sys.stderr)
+                    sys.exit(1)
                 r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
                 r_ac_name = r_ac_json["response"]["Customer CA"]
 
@@ -313,7 +316,9 @@ def start():
 
         # Calculate difference
         avg_kw_change = op_avg_kw - report_op_kw
+        avg_kw_change = round(avg_kw_change, 8)
         peak_kw_change = op_max_kw - report_op_max_kw
+        peak_kw_change = round(peak_kw_change, 8)
 
         print("")
         print(f"avg_kw_change: {avg_kw_change}")

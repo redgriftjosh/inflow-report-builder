@@ -4,6 +4,7 @@ import common_functions
 import sys
 import plotly.io as pio
 import json
+from utilities import compressor_util
 
 def get_order_height(hist_id, ac_ids, dev):
     try:
@@ -311,10 +312,7 @@ def get_df_for_each_ac(ac_ids, report_id, dev):
             common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        if "CFM" in ac_json["response"]:
-            cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
-        else:
-            cfm = 1
+        cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
             # common_functions.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             # sys.exit(1)
         
