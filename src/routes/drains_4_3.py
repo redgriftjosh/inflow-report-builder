@@ -2,6 +2,7 @@ import json
 import sys
 import common_functions
 from datetime import datetime, timedelta
+from utilities import requests_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -16,7 +17,7 @@ def get_payload():
     return dev, report_id
 
 def get_drains(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     
     try:
         return report_json["response"]["drain"]
@@ -25,7 +26,7 @@ def get_drains(report_id, dev):
         sys.exit(1)
 
 def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
-    drain_json = common_functions.get_req("drain", drain, dev)
+    drain_json = requests_util.get_req("drain", drain, dev)
 
     try:
         off_min = drain_json["response"]["baseline_off_min"]
@@ -53,7 +54,7 @@ def get_kw_per_year(drain, peak_acfm_15_min, kw_max_avg_15, dev):
 
 
 def get_global_values(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     try:
         peak_acfm_15_min = report_json["response"]["15 Min Peak Flow"]
@@ -74,7 +75,7 @@ def get_cost_to_operate(report_json, kw_demand_15min, kwh_annual, demand_schedul
     except:
         print(f"Can't find any Electrical Utility info!", file=sys.stderr)
         sys.exit(1)
-    elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
+    elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
     on_peak_list = []
@@ -83,7 +84,7 @@ def get_cost_to_operate(report_json, kw_demand_15min, kwh_annual, demand_schedul
     kwh_off_peak_list = []
 
     for elec_entry_id in elec_entry_ids:
-        elec_entry_json = common_functions.get_req("electrical_provider_entry", elec_entry_id, dev)
+        elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
         month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
         month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
         kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
@@ -155,11 +156,11 @@ def start():
         if kwh_annual != 0:
             cost_to_operate = get_cost_to_operate(report_json, kw_max_avg_15, kwh_annual, demand_schedule_id="no demand schedules", op_id="no", dev=dev)
             print(f"cost_to_operate: {cost_to_operate}")
-            common_functions.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
+            requests_util.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
         else:
             cost_to_operate = 0
             print(f"cost_to_operate: {cost_to_operate}")
-            common_functions.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
+            requests_util.patch_req("drain", drain, body={"cost_per_yr": cost_to_operate, "kw_per_yr": kwh_annual}, dev=dev)
 
     
 

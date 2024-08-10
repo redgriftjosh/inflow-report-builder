@@ -1,7 +1,7 @@
 import common_functions
 import sys
 import json
-from utilities import compressor_util
+from utilities import compressor_util, requests_util
 
 
 def get_payload():
@@ -25,7 +25,7 @@ def get_payload():
     
 #     slope_cfms = []
 #     for slope in slope_ids:
-#         slope_json = common_functions.get_req("vfd_slope_entries", slope, dev)
+#         slope_json = requests_util.get_req("vfd_slope_entries", slope, dev)
 #         try:
 #             slope_cfms.append(slope_json["response"]["capacity-acfm"])
 #         except:
@@ -36,7 +36,7 @@ def get_payload():
 
 
 def get_cfms(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     try:
         ac_ids = report_json["response"]["air_compressor"]
     except:
@@ -45,7 +45,7 @@ def get_cfms(report_id, dev):
 
     cfms = []
     for idx, ac_id in enumerate(ac_ids):
-        ac_json = common_functions.get_req("air_compressor", ac_id, dev)
+        ac_json = requests_util.get_req("air_compressor", ac_id, dev)
 
         try:
             ac_name = ac_json["response"]["Customer CA"]
@@ -74,7 +74,7 @@ def get_cfms(report_id, dev):
     return cfms
 
 def get_max_flows(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     try:
         op_ids = report_json["response"]["operation_period"]
     except:
@@ -83,7 +83,7 @@ def get_max_flows(report_id, dev):
     
     flows = []
     for op_id in op_ids:
-        op_json = common_functions.get_req("operation_period", op_id, dev)
+        op_json = requests_util.get_req("operation_period", op_id, dev)
         try:
             flow = op_json["response"]["ACFM Made"]
             flows.append(flow)
@@ -124,14 +124,14 @@ def start():
         "supply-capacity": supply_capacity
     }
 
-    common_functions.patch_req("Report", report_id, body, dev)
-    common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body, dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 start()
 
 # my_dict_compile_master = common_functions.compile_master_df(report_id, dev)
 
-# common_functions.patch_req("Report", report_id, body={"loading": f"Got all the calculations, updating chart...", "is_loading_error": "no"}, dev=dev)
+# requests_util.patch_req("Report", report_id, body={"loading": f"Got all the calculations, updating chart...", "is_loading_error": "no"}, dev=dev)
 # cfms = my_dict_compile_master["cfms"]
 # max_flow_op = my_dict_compile_master["max_flow_op"]
 # max_avg_15 = my_dict_compile_master["max_avg_15"]
@@ -162,5 +162,5 @@ start()
 #     "supply-capacity": supply_capacity
 # }
 
-# common_functions.patch_req("Report", report_id, body, dev)
-# common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+# requests_util.patch_req("Report", report_id, body, dev)
+# requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)

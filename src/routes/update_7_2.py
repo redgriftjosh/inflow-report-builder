@@ -2,14 +2,14 @@ import sys
 import json
 import common_functions
 import reset_dataset_7_2
-from utilities import data_crunch_util, compressor_util
+from utilities import data_crunch_util, compressor_util, requests_util
 # import common_functions 
 
 
 def calculate_values(df, operating_period_id, report_json, dev):
     ac_ids = report_json["response"]["air_compressor"]
     for idx, ac in enumerate(ac_ids):
-        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
 
         # Get the Name
         if "Customer CA" in ac_json["response"]:
@@ -67,18 +67,18 @@ def calculate_values(df, operating_period_id, report_json, dev):
         
         # print(f"body: {body}")
         # Send the patch to the dataset linked to the right air compressor 
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         dataset_ids = operating_period_json["response"]["dataset_7_2"]
         for dataset_id in dataset_ids:
-            dataset_json = common_functions.get_req("dataset_7_2", dataset_id, dev)
+            dataset_json = requests_util.get_req("dataset_7_2", dataset_id, dev)
             if dataset_json["response"]["air_compressor"] == ac:
-                common_functions.patch_req("dataset_7_2", dataset_id, body, dev)
+                requests_util.patch_req("dataset_7_2", dataset_id, body, dev)
 
 
 def loop_through_operating_periods(report_id, report_json, dev):
     if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         operating_period_ids = report_json["response"]["operation_period"]
-        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         print("No Operating Periods Found! You need at least one Operating Period.", file=sys.stderr)
         sys.exit(1)
@@ -103,11 +103,11 @@ def start():
         dev = ''
 
     report_id = data.get('report-id')
-    report_json = common_functions.get_req("Report", report_id, dev)
-    common_functions.patch_req("Report", report_id, body={"loading": "Making sure your charts are set up to display all the data...", "is_loading_error": "no"}, dev=dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
+    requests_util.patch_req("Report", report_id, body={"loading": "Making sure your charts are set up to display all the data...", "is_loading_error": "no"}, dev=dev)
     reset_dataset_7_2.start(report_id, report_json, dev)
     loop_through_operating_periods(report_id, report_json, dev)
-    common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 if __name__ == "__main__":
     start()

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from eco_calculation import proposed_global
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -48,9 +49,9 @@ def get_flow_reduction(avg_pressure, percent_leaks, percent_poorly_regulated, av
 
 
 def get_pressure_index(report_id, op_json, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
     baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
 
     try:
         p_what = baseline_operation_7_1_json["response"]["p_what"]
@@ -63,7 +64,7 @@ def get_pressure_index(report_id, op_json, dev):
         pressure = op_json["response"]["P2"][i]
         return pressure
     except:
-        common_functions.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
         print(f"Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like: P4", file=sys.stderr)
         sys.exit(1)
 
@@ -72,7 +73,7 @@ def get_peak_acfm(op_json, dev):
 
     peak_acfms = []
     for dataset_7_2_id in dataset_7_2_ids:
-        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        dataset_7_2_json = requests_util.get_req("dataset_7_2", dataset_7_2_id, dev)
         
         peak_acfm = dataset_7_2_json["response"]["peak-15-acfm"]
         peak_acfms.append(peak_acfm)
@@ -80,11 +81,11 @@ def get_peak_acfm(op_json, dev):
     return sum(peak_acfms)
 
 def get_low_pressure(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     pressure_sensor_ids = report_json["response"]["pressure_sensor"]
 
     for pressure_sensor_id in pressure_sensor_ids:
-        pressure_json = common_functions.get_req("pressure_sensor", pressure_sensor_id, dev)
+        pressure_json = requests_util.get_req("pressure_sensor", pressure_sensor_id, dev)
         header = pressure_json["response"]["header"]
         if header == True:
             return pressure_json["response"]["15-min-low"]
@@ -93,13 +94,13 @@ def get_low_pressure(report_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
 
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_proposed_json = requests_util.get_req("scenario_proposed", scenario_proposed_id, dev)
     op_ids = scenario_proposed_json["response"]["operation_period"]
 
     pressure_id = scenario_proposed_json["response"]["pressure"]
-    pressure_json = common_functions.get_req("pressure", pressure_id, dev)
+    pressure_json = requests_util.get_req("pressure", pressure_id, dev)
     target_pressure = pressure_json["response"]["target_pressure"]
     percent_leaks = pressure_json["response"]["percent_leaks"]
     print(f"percent_leaks: {percent_leaks}")
@@ -107,7 +108,7 @@ def start():
     print(f"percent_poorly_regulated: {percent_poorly_regulated}")
 
     for op_id in op_ids:
-        op_json = common_functions.get_req("operation_period", op_id, dev)
+        op_json = requests_util.get_req("operation_period", op_id, dev)
         op_name = op_json["response"]["Name"]
         print("")
         print(f"Schedule: {op_name}")

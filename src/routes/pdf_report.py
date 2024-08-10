@@ -1,4 +1,4 @@
-import pdfkit
+import pdfkit # type: ignore
 import json
 import sys
 

@@ -1,6 +1,7 @@
 import sys
 import json
 from routes import common_functions
+from utilities import requests_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -14,10 +15,10 @@ def get_payload():
     return dev, report_id
 
 def get_dependancies(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     leak_id = report_json["response"]["leak"]
 
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
     env_adj = leak_json["response"]["environmental_adjustment"]
 
     leak_entry_ids = leak_json["response"]["leak_entry"]
@@ -26,7 +27,7 @@ def get_dependancies(report_id, dev):
     ufs = []
 
     for entry in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
+        leak_entry_json = requests_util.get_req("leak_entry", entry, dev)
         cfms.append(leak_entry_json["response"]["uf"])
         ufs.append(leak_entry_json["response"]["cfm"])
 
@@ -44,7 +45,7 @@ def start():
 
     adj_cfm = calculate_adj_cfm(cfms, ufs, env_adj)
 
-    common_functions.patch_req("leak", leak_id, body={"total_cfm_adjusted": adj_cfm}, dev=dev)
+    requests_util.patch_req("leak", leak_id, body={"total_cfm_adjusted": adj_cfm}, dev=dev)
 
 
 
@@ -58,22 +59,22 @@ start()
 
 #     environmental_adj_cfm = cfm * (uf / 100) * (environmental_adjustment / 100)
 
-#     common_functions.patch_req("leak_entry", leak_entry_id, body={"environmental_adj_cfm": environmental_adj_cfm}, dev=dev)
+#     requests_util.patch_req("leak_entry", leak_entry_id, body={"environmental_adj_cfm": environmental_adj_cfm}, dev=dev)
 # elif change_all_leaks == "yes":
 #     leak_id = data.get('leak')
 
-#     leak_json = common_functions.get_req("leak", leak_id, dev)
+#     leak_json = requests_util.get_req("leak", leak_id, dev)
 
 #     environmental_adjustment = leak_json["response"]["environmental_adjustment"]
 #     leak_entry_ids = leak_json["response"]["leak_entry"]
 
 #     for id in leak_entry_ids:
-#         leak_entry_json = common_functions.get_req("leak_entry", id, dev)
+#         leak_entry_json = requests_util.get_req("leak_entry", id, dev)
 #         uf = leak_entry_json["response"]["uf"]
 #         cfm = leak_entry_json["response"]["cfm"]
 
 #         environmental_adj_cfm = cfm * (uf / 100) * (environmental_adjustment / 100)
-#         common_functions.patch_req("leak_entry", id, body={"environmental_adj_cfm": environmental_adj_cfm}, dev=dev)
+#         requests_util.patch_req("leak_entry", id, body={"environmental_adj_cfm": environmental_adj_cfm}, dev=dev)
 
 
         

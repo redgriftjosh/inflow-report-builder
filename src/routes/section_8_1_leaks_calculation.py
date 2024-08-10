@@ -2,22 +2,23 @@ import sys
 import json
 import common_functions
 from datetime import datetime, timedelta
+from utilities import requests_util
 
 def get_num_leaks(report_json, dev):
     leak_id = report_json["response"]["leak"]
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
     leak_entry_ids = leak_json["response"]["leak_entry"]
     num_leaks = len(leak_entry_ids)
     cfms = []
     for id in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", id, dev)
+        leak_entry_json = requests_util.get_req("leak_entry", id, dev)
         cfms.append(leak_entry_json["response"]["cfm"])
 
     total_cfm = sum(cfms)
     return num_leaks, total_cfm
 
 def get_section_8_1_inputs(eco_table_8_1_id, dev):
-    eco_table_8_1_json = common_functions.get_req("eco_table_8_1", eco_table_8_1_id, dev)
+    eco_table_8_1_json = requests_util.get_req("eco_table_8_1", eco_table_8_1_id, dev)
     cost_per_leak_repair = eco_table_8_1_json["response"]["cost_per_leak_repair"]
     multiply_factor = eco_table_8_1_json["response"]["multiply_factor"]
     additional_value = eco_table_8_1_json["response"]["additional_value"]
@@ -32,7 +33,7 @@ def get_section_8_1_inputs(eco_table_8_1_id, dev):
 #         op_ids = report_json["response"]["operation_period"]
 #         hrs_yr = []
 #         for id in op_ids:
-#             op_json = common_functions.get_req("operation_period", id, dev)
+#             op_json = requests_util.get_req("operation_period", id, dev)
 #             hrs = op_json["response"]["Hours/yr"]
 #             hrs_yr.append(hrs)
         
@@ -55,7 +56,7 @@ def get_section_8_1_inputs(eco_table_8_1_id, dev):
 
 def calculate_dollars_per_year(report_json, kw_demand_15min, kwh_annual, dev):
     elec_provider_id = report_json["response"]["electrical_provider"]
-    elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
+    elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
     on_peak_list = []
@@ -64,7 +65,7 @@ def calculate_dollars_per_year(report_json, kw_demand_15min, kwh_annual, dev):
     kwh_off_peak_list = []
 
     for elec_entry_id in elec_entry_ids:
-        elec_entry_json = common_functions.get_req("electrical_provider_entry", elec_entry_id, dev)
+        elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
         month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
         month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
         kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
@@ -132,12 +133,12 @@ def calculate_incentive_estimate(leak_incentive_value, percent_or_o_and_m_symbol
 
 def get_baseline_kwh_per_year(report_json, dev):
     baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
     baseline_row_ids = baseline_operation_7_1_json["response"]["baseline_operation_7_1_row"]
 
     kwh_list = []
     for id in baseline_row_ids:
-        baseline_row_json = common_functions.get_req("baseline_operation_7_1_row", id, dev)
+        baseline_row_json = requests_util.get_req("baseline_operation_7_1_row", id, dev)
 
         kwh_list.append(baseline_row_json["response"]["kwh_annual"])
 
@@ -181,7 +182,7 @@ def start():
     
     # Get the standard data
     report_id = data.get('report_id') # For report_json
-    report_json = common_functions.get_req("report", report_id, dev) # For retrieving dependencies
+    report_json = requests_util.get_req("report", report_id, dev) # For retrieving dependencies
     eco_table_8_1_id = data.get('eco_table_8_1_id') # For retreiving input values and sending back to the right spot
 
     # Gets all the dependencies
@@ -214,10 +215,10 @@ def start():
     body = get_body(installed, kw_demand, kwh_per_year, dollars_per_year, incentive_estimate, percent_or_o_and_m, payback_years)
 
     # Sending the final calculations back to Bubble.io
-    common_functions.patch_req("eco_table_8_1", eco_table_8_1_id, body, dev)
+    requests_util.patch_req("eco_table_8_1", eco_table_8_1_id, body, dev)
 
     # Update the total hours in appendix right here for now.
-    response = common_functions.patch_req("report", report_id, body={"total_hours": total_op_hours}, dev=dev)
+    response = requests_util.patch_req("report", report_id, body={"total_hours": total_op_hours}, dev=dev)
     print(f"update totale hours: {response}")
 
 

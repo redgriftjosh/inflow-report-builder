@@ -2,6 +2,7 @@ import sys
 import json
 import common_functions
 import re
+from utilities import requests_util
 
 # This script creates a duplacate of the report for a proposed scenario as well as a baseline scenario so the user can make modifications and get numbers for section 8.1
 
@@ -30,7 +31,7 @@ def get_payload():
         print(f"Can't find variable: scenario_id", file=sys.stderr)
         sys.exit(1)
     
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     try:
         created_by_user_id = report_json["response"]["Created By"]
@@ -43,10 +44,10 @@ def get_payload():
     return dev, report_id, scenario_id, created_by_user_id
 
 def create_proposed(dev, report_id, scenario_id):
-    common_functions.post_req("scenario_proposed", body={})
+    requests_util.post_req("scenario_proposed", body={})
 
 def get_compressors(dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     compressor_ids = report_json["response"]["air_compressor"]
     
 def clean_json(my_json, processed_ids):
@@ -128,9 +129,9 @@ def update_new_things(new_thing_id, new_type, new_things_json, dev):
         if isinstance(value, list):
 
             for id in value:
-                common_functions.patch_req(key, str(id), body={new_type: new_thing_id}, dev=dev)
+                requests_util.patch_req(key, str(id), body={new_type: new_thing_id}, dev=dev)
         else:
-            common_functions.patch_req(key, str(value), body={new_type: new_thing_id}, dev=dev)
+            requests_util.patch_req(key, str(value), body={new_type: new_thing_id}, dev=dev)
 
 def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
     print(f"get_new_things - iteration: {iteration}")
@@ -141,7 +142,7 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
     # for each object attached to the report... e.g. 'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021']
     for key, value in my_json.items():
         try:
-            common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Copying: {key}", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"Copying: {key}", "is_loading_error": "no"}, dev=dev)
         except:
             print(f"Could not update loading text: {key}")
         # Check if the value is an array e.g. ['12398467x219083473243224', '10843759387x0293481029374021']
@@ -155,12 +156,12 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
                 # Get the json for that object id
                 try:
-                    my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
+                    my_thing = requests_util.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
                     # print(f"get_new_things_{iteration}: {json.dumps(my_thing)[:1000]}")
                     # print('')
                 except:
                     try:
-                        common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Error: Could not find item: {key}. Please tell Josh to check the database for spelling mistakes.", "is_loading_error": "yes"}, dev=dev)
+                        requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"Error: Could not find item: {key}. Please tell Josh to check the database for spelling mistakes.", "is_loading_error": "yes"}, dev=dev)
                     except:
                         print(f"Could not update loading text: {key}")
 
@@ -184,7 +185,7 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                     print('')
                 
 
-                response = common_functions.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
+                response = requests_util.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
                 # print(f"get_new_things_{iteration} - post_req: {response}")
                 # print('')
                 # print('')
@@ -205,7 +206,7 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
             processed_ids.append(value)
 
             # Get the json for that object id
-            my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
+            my_thing = requests_util.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
             # print(f"get_new_things_{iteration}: {json.dumps(my_thing)[:1000]}")
             # print('')
             
@@ -227,7 +228,7 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 print('No more things to create here')
                 print('') 
 
-            response = common_functions.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
+            response = requests_util.post_req(key, my_thing, dev) # Create new object with the same json in the one we just got
             # print(f"get_new_things_{iteration} - post_req: {response}")
             print('')
             print('')
@@ -244,17 +245,17 @@ def get_new_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 def assign_to_proposed_scenario(new_things_json, dev, scenario_id):
     print(f"assign_to_proposed_scenario:")
     print(f"assign_to_proposed_scenario: {new_things_json}")
-    scenario_proposed_response = common_functions.post_req("scenario_proposed", new_things_json, dev)
+    scenario_proposed_response = requests_util.post_req("scenario_proposed", new_things_json, dev)
     scenario_proposed_id = scenario_proposed_response['id']
 
-    common_functions.patch_req("scenario", scenario_id, body={"scenario_proposed": scenario_proposed_id}, dev=dev)
+    requests_util.patch_req("scenario", scenario_id, body={"scenario_proposed": scenario_proposed_id}, dev=dev)
 
 def assign_to_baseline_scenario(new_things_json, dev, scenario_id):
 
-    scenario_baseline_response = common_functions.post_req("scenario_baseline", new_things_json, dev)
+    scenario_baseline_response = requests_util.post_req("scenario_baseline", new_things_json, dev)
     scenario_baseline_id = scenario_baseline_response['id']
 
-    common_functions.patch_req("scenario", scenario_id, body={"scenario_baseline": scenario_baseline_id}, dev=dev)
+    requests_util.patch_req("scenario", scenario_id, body={"scenario_baseline": scenario_baseline_id}, dev=dev)
 
 
 def start():
@@ -263,7 +264,7 @@ def start():
     processed_ids = []
     processed_ids.append(report_id)
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     report_json = clean_json(report_json, processed_ids)
 

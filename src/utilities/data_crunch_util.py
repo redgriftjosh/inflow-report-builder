@@ -30,7 +30,7 @@ def data_crunch_csv_to_df(csv_url):
 # Fetches the CSV from the given Operation Period and returns a pandas DataFrame
 def get_op_data_crunch(op_id, dev):
 
-    op_json = common_functions.get_req("operation_period", op_id, dev)
+    op_json = requests_util.get_req("operation_period", op_id, dev)
     try:
         op_name = op_json["response"]["Name"]
     except:
@@ -53,7 +53,7 @@ def get_op_data_crunch(op_id, dev):
 # Fetches the CSV from the given Report and returns a pandas DataFrame
 def get_report_data_crunch(report_id, field, dev):
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     
     try:
         csv_url = report_json["response"][field]
@@ -70,7 +70,7 @@ def get_report_data_crunch(report_id, field, dev):
 
 # Adds the Pressure CSVs to the Master Data Crunch DataFrame
 def add_pressure_to_master_df(master_df, report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     master_df_pressure = None
 
@@ -100,7 +100,7 @@ def add_pressure_to_master_df(master_df, report_id, dev):
 
 # Fetching the Datalogger CSVs and returns an unfiltered DataFrame
 def generate_raw_data_crunch(dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
         ac_ids = report_json["response"]["air_compressor"]
     else:
@@ -111,18 +111,18 @@ def generate_raw_data_crunch(dev, report_id):
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
         else:
             print(f"Missing Name! Air Compressor ID: {ac}", file=sys.stderr)
             sys.exit(1)
         
-        common_functions.patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
 
         if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
             ac_data_logger_id = ac_json["response"]["ac_data_logger"]
-            ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+            ac_data_logger_json = requests_util.get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
             print(f"Missing Data Logger! Air Compressor: {ac_name}", file=sys.stderr)
             sys.exit(1)
@@ -134,14 +134,14 @@ def generate_raw_data_crunch(dev, report_id):
             print(f"Missing Data Logger! Air Compressor: {ac_name}", file=sys.stderr)
             sys.exit(1)
 
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
         df = common_functions.csv_to_df(csv_url)
         # response = requests.get(csv_url) # Step 2: Download the CSV file
         # response.raise_for_status() # Check that the request was successful
             
         # csv_data = StringIO(response.text) # Convert CSV into text of some sort
         # df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
         if "volts" in ac_json["response"]:
             volts = ac_json["response"]["volts"]
         else:
@@ -176,7 +176,7 @@ def generate_raw_data_crunch(dev, report_id):
         df[f'15_Min_Avg_kW_AC{idx+1}'] = df[f'Kilowatts{idx+1}'][::-1].rolling(window=75, min_periods=75).mean()[::-1].fillna(0)
         df[f'2_Min_Avg_kW_AC{idx+1}'] = df[f'Kilowatts{idx+1}'][::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0)
 
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
         # Create ACFM Column
 
         if "Control Type" in ac_json["response"]:
@@ -203,7 +203,7 @@ def generate_raw_data_crunch(dev, report_id):
             print("added first DataFrame to master_df")
         else:
             master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
-            common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
     master_df.info()
@@ -233,9 +233,9 @@ def generate_raw_data_crunch(dev, report_id):
     return master_df
 
 def trim_df(report_id, df, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         try:
             trim_id = report_json["response"]["trim"]
             report_id = report_json["response"]["_id"]
@@ -259,9 +259,9 @@ def trim_df(report_id, df, dev):
         return df
 
 def exclude_from_df(report_id, df, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "exclusion" in report_json["response"]:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Removing Exclusions from the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Removing Exclusions from the dataset...", "is_loading_error": "no"}, dev=dev)
         try:
             exclusion_ids = report_json["response"]["exclusion"]
             report_id = report_json["response"]["_id"]
@@ -349,13 +349,13 @@ def csv_to_df(csv_data, report_id, dev):
     except Exception as e:
         print(f"Cannot read CSV. Please follow the formatting Guide.", file=sys.stderr)
         sys.exit(1)
-    common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅", "is_loading_error": "no"}, dev=dev)
     df.info()
 
     print(df.head(20))
     try:
         pd.to_datetime(df.iloc[:, 1], format='%m/%d/%y %I:%M:%S %p')
-        common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Checking for Consistend Dates...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Checking for Consistend Dates...", "is_loading_error": "no"}, dev=dev)
     except ValueError:
         print("Column 'B' is not properly formatted as a date.", file=sys.stderr)
         sys.exit(1)
@@ -374,7 +374,7 @@ def csv_to_df(csv_data, report_id, dev):
                 print(f"It looks like the date column is not seeing the seconds. Double check the date format matches 'mm/dd/yy hh:mm:ss AM/PM': {i}", file=sys.stderr)
             print(f"It looks like not all dates are 12 seconds apart! I found this at row {i}", file=sys.stderr)
             sys.exit(1)
-    common_functions.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Consistend Dates ✅", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"CSV Readable ✅, Date Format ✅, Consistend Dates ✅", "is_loading_error": "no"}, dev=dev)
 
     return df
 

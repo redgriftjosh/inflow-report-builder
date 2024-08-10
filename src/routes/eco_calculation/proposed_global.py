@@ -1,5 +1,6 @@
 import os
 import sys
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -7,9 +8,9 @@ sys.path.append(parent)
 import common_functions
 
 def get_report_pressure(report_id, op_name, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
     baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
 
     operation_period_ids = report_json["response"]["operation_period"]
 
@@ -20,7 +21,7 @@ def get_report_pressure(report_id, op_name, dev):
         sys.exit(1)
     
     for operating_period_id in operation_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         if operating_period_json["response"]["Name"] == op_name:
             i = int(p_what.replace("P", ""))-1
             pressure = operating_period_json["response"]["P2"][i]
@@ -28,60 +29,60 @@ def get_report_pressure(report_id, op_name, dev):
             return pressure, i, pressure_list
             
 def get_real_op_avg_acfm(report_id, op_name, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     # avg_acfm = report_json["response"]["avg_acfm"]
 
     operation_period_ids = report_json["response"]["operation_period"]
 
     for operating_period_id in operation_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         if operating_period_json["response"]["Name"] == op_name:
             acfm = operating_period_json["response"]["ACFM Made"]
             return acfm
 
 def get_real_op_peak_acfm(report_id, op_name, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     # avg_acfm = report_json["response"]["avg_acfm"]
 
     operation_period_ids = report_json["response"]["operation_period"]
 
     for operating_period_id in operation_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         if operating_period_json["response"]["Name"] == op_name:
             acfm = operating_period_json["response"]["peak_15min_acfm"]
             return acfm
 
 def get_real_op_avg_kw(report_id, op_name, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     # avg_acfm = report_json["response"]["avg_acfm"]
 
     operation_period_ids = report_json["response"]["operation_period"]
 
     for operating_period_id in operation_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         if operating_period_json["response"]["Name"] == op_name:
             kw = operating_period_json["response"]["kW"]
             return kw
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
+    response = requests_util.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
     scenario_difference = response["id"]
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
 
     return scenario_difference
 
 def update_op_stats(op_id, report_id, dev):
     print(f"Updating op stats for op_id: {op_id}")
-    op_json = common_functions.get_req("operation_period", op_id, dev)
+    op_json = requests_util.get_req("operation_period", op_id, dev)
     try:
         scenario_differences = op_json["response"]["scenario_differences"]
     except:
         print(f"No scenario_differences, creating one...")
         scenario_differences = create_new_scenario_difference(op_id, dev)
 
-    scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences, dev)
+    scenario_differences_json = requests_util.get_req("scenario_differences", scenario_differences, dev)
 
     cfm_changes = []
 
@@ -157,9 +158,9 @@ def update_op_stats(op_id, report_id, dev):
 
     pressure_list[i] = new_psi
 
-    common_functions.patch_req("operation_period", op_id, body={"P2": pressure_list, "kW": new_kw, "ACFM Made": new_acfm, "peak_15min_acfm": new_peak_acfm}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"P2": pressure_list, "kW": new_kw, "ACFM Made": new_acfm, "peak_15min_acfm": new_peak_acfm}, dev=dev)
 
     scenario_differences = op_json["response"]["scenario_differences"]
 
-    common_functions.patch_req("scenario_differences", scenario_differences, body={"orig_psi": orig_psi, "orig_kw": orig_kw, "orig_acfm": orig_acfm}, dev=dev)
+    requests_util.patch_req("scenario_differences", scenario_differences, body={"orig_psi": orig_psi, "orig_kw": orig_kw, "orig_acfm": orig_acfm}, dev=dev)
 

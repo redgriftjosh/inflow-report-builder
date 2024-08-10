@@ -3,6 +3,7 @@ import sys
 import json
 from eco_calculation import proposed_global
 import pandas as pd
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -37,18 +38,18 @@ def get_payload():
     return dev, report_id, scenario_id
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
+    response = requests_util.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
     scenario_difference = response["id"]
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
 
     return scenario_difference
 
 def get_pressure_index(report_id, op_json, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
     baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
 
     try:
         p_what = baseline_operation_7_1_json["response"]["p_what"]
@@ -61,12 +62,12 @@ def get_pressure_index(report_id, op_json, dev):
         pressure = op_json["response"]["P2"][0]
         return pressure
     except:
-        common_functions.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
         print(f"Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like: P4", file=sys.stderr)
         sys.exit(1)
 
 def check_is_new(ac_id, dev):
-    ac_json = common_functions.get_req("air_compressor", ac_id, dev)
+    ac_json = requests_util.get_req("air_compressor", ac_id, dev)
 
     # If the user didn't define the variable just assume it's not a new compressor
     try:
@@ -84,12 +85,12 @@ def check_is_new(ac_id, dev):
 def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
     s_op_name = s_op_json["response"]["Name"]
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     r_op_ids = report_json["response"]["operation_period"]
 
     # Go through all the operating periods in the report and find the one that matches the name we want
     for r_op_id in r_op_ids:
-        r_op_json = common_functions.get_req("operation_period", r_op_id, dev)
+        r_op_json = requests_util.get_req("operation_period", r_op_id, dev)
         r_op_name = r_op_json["response"]["Name"]
 
         if r_op_name == s_op_name:
@@ -97,13 +98,13 @@ def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
 
             # Go through all the datasets in the report section 7.2 and find the one that matches the Air Compressor we want
             for r_dataset_id in r_dataset_ids:
-                r_dataset_json = common_functions.get_req("dataset_7_2", r_dataset_id, dev)
+                r_dataset_json = requests_util.get_req("dataset_7_2", r_dataset_id, dev)
                 try:
                     r_ac_id = r_dataset_json["response"]["air_compressor"]
                 except:
                     print(f"Couldn't find the data in section 7.2. If you cloned this report, try re-running section 7.2 and then come back and run this one again.", file=sys.stderr)
                     sys.exit(1)
-                r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
+                r_ac_json = requests_util.get_req("air_compressor", r_ac_id, dev)
                 r_ac_name = r_ac_json["response"]["Customer CA"]
 
                 if r_ac_name == s_ac_name:
@@ -121,12 +122,12 @@ def get_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
 def get_peak_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
     s_op_name = s_op_json["response"]["Name"]
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     r_op_ids = report_json["response"]["operation_period"]
 
     # Go through all the operating periods in the report and find the one that matches the name we want
     for r_op_id in r_op_ids:
-        r_op_json = common_functions.get_req("operation_period", r_op_id, dev)
+        r_op_json = requests_util.get_req("operation_period", r_op_id, dev)
         r_op_name = r_op_json["response"]["Name"]
 
         if r_op_name == s_op_name:
@@ -134,9 +135,9 @@ def get_peak_kw_per_cfm(report_id, s_ac_name, s_op_json, dev):
 
             # Go through all the datasets in the report section 7.2 and find the one that matches the Air Compressor we want
             for r_dataset_id in r_dataset_ids:
-                r_dataset_json = common_functions.get_req("dataset_7_2", r_dataset_id, dev)
+                r_dataset_json = requests_util.get_req("dataset_7_2", r_dataset_id, dev)
                 r_ac_id = r_dataset_json["response"]["air_compressor"]
-                r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
+                r_ac_json = requests_util.get_req("air_compressor", r_ac_id, dev)
                 r_ac_name = r_ac_json["response"]["Customer CA"]
 
                 if r_ac_name == s_ac_name:
@@ -150,7 +151,7 @@ def get_acfm_entered(op_json, ac_id, dev):
     dataset_7_2_ids = op_json["response"]["dataset_7_2"]
 
     for dataset_7_2_id in dataset_7_2_ids:
-        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        dataset_7_2_json = requests_util.get_req("dataset_7_2", dataset_7_2_id, dev)
         row_ac_id = dataset_7_2_json["response"]["air_compressor"]
 
         if row_ac_id == ac_id:
@@ -161,7 +162,7 @@ def get_psi_drop_entered(op_json, ac_id, dev):
     dataset_7_2_ids = op_json["response"]["dataset_7_2"]
 
     for dataset_7_2_id in dataset_7_2_ids:
-        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        dataset_7_2_json = requests_util.get_req("dataset_7_2", dataset_7_2_id, dev)
         row_ac_id = dataset_7_2_json["response"]["air_compressor"]
 
         if row_ac_id == ac_id:
@@ -181,7 +182,7 @@ def get_peak_acfm_entered(op_json, ac_id, dev):
     dataset_7_2_ids = op_json["response"]["dataset_7_2"]
 
     for dataset_7_2_id in dataset_7_2_ids:
-        dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2_id, dev)
+        dataset_7_2_json = requests_util.get_req("dataset_7_2", dataset_7_2_id, dev)
         row_ac_id = dataset_7_2_json["response"]["air_compressor"]
 
         if row_ac_id == ac_id:
@@ -189,13 +190,13 @@ def get_peak_acfm_entered(op_json, ac_id, dev):
             return peak_acfm
 
 def get_op_report_ac_kw(report_id, op_name, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     op_ids = report_json["response"]["operation_period"]
 
     kw = []
     for op_id in op_ids:
-        op_json = common_functions.get_req("operation_period", op_id, dev)
+        op_json = requests_util.get_req("operation_period", op_id, dev)
 
         if op_json["response"]["Name"] == op_name:
             kw = op_json["response"]["kW"]
@@ -203,20 +204,20 @@ def get_op_report_ac_kw(report_id, op_name, dev):
 
 # Finds the right Operating Schedule then returns a sum of all peak-15-kws in table 7.2 On REPORT NOT SCENARIO
 def get_op_report_max_ac_kw(report_id, op_name, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     op_ids = report_json["response"]["operation_period"]
 
     kw = []
     for op_id in op_ids:
-        op_json = common_functions.get_req("operation_period", op_id, dev)
+        op_json = requests_util.get_req("operation_period", op_id, dev)
 
         if op_json["response"]["Name"] == op_name:
             dataset_7_2_ids = op_json["response"]["dataset_7_2"]
 
             max_kws = []
             for dataset_7_2 in dataset_7_2_ids:
-                dataset_7_2_json = common_functions.get_req("dataset_7_2", dataset_7_2, dev)
+                dataset_7_2_json = requests_util.get_req("dataset_7_2", dataset_7_2, dev)
                 
                 max_kw = dataset_7_2_json["response"]["peak-15-kw"]
                 max_kws.append(max_kw)
@@ -227,7 +228,7 @@ def get_op_report_max_ac_kw(report_id, op_name, dev):
 def get_pressure_change(op_json, dev):
     try:
         scenario_difference_id = op_json["response"]["scenario_differences"]
-        scenario_difference_json = common_functions.get_req("scenario_differences", scenario_difference_id, dev)
+        scenario_difference_json = requests_util.get_req("scenario_differences", scenario_difference_id, dev)
 
         filter_psi_change = scenario_difference_json["response"]["filter_psi_change"]
 
@@ -243,9 +244,9 @@ def start():
     dev, report_id, scenario_id = get_payload()
     print(f"report_id: {report_id}, dev: {dev}, scenario_id: {scenario_id}")
     
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_proposed_json = requests_util.get_req("scenario_proposed", scenario_proposed_id, dev)
 
     ac_ids = scenario_proposed_json["response"]["air_compressor"]
     operating_period_ids = scenario_proposed_json["response"]["operation_period"]
@@ -256,7 +257,7 @@ def start():
         avg_kws = []
         max_kws = []
         
-        op_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        op_json = requests_util.get_req("operation_period", operating_period_id, dev)
 
         op_name = op_json["response"]["Name"]
         # show_calculations[f'Operation Period{idx+1}'] = str(op_name)
@@ -272,7 +273,7 @@ def start():
         gal_per_cfm = common_functions.get_gal_per_cfm(ac_ids, report_id, dev)
         # show_calculations["gal/cfm"] = gal_per_cfm
         for ac in ac_ids:
-            ac_json = common_functions.get_req("air_compressor", ac, dev)
+            ac_json = requests_util.get_req("air_compressor", ac, dev)
             ac_name = ac_json["response"]["Customer CA"]
 
             # Determine if the entered compressor is a new compressor
@@ -341,14 +342,14 @@ def start():
         print(f"peak_kw_change: {peak_kw_change}")
         # show_calculations[f'The Change in Peak 15 Min kW'] = peak_kw_change
 
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         try:
             scenario_differences = operating_period_json["response"]["scenario_differences"]
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
         # show_calculations = json.dumps(show_calculations)
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": avg_kw_change, "compressor_peak_kw_change": peak_kw_change}, dev=dev)
+        requests_util.patch_req("scenario_differences", scenario_differences, body={"compressor_kw_change": avg_kw_change, "compressor_peak_kw_change": peak_kw_change}, dev=dev)
 
         proposed_global.update_op_stats(operating_period_id, report_id, dev)
 

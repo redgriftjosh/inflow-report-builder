@@ -1,9 +1,10 @@
 import sys
 import json
 import common_functions
+from utilities import requests_util
 
 def get_dependencies(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     peak_acfm_15min = report_json["response"]["15 Min Peak Flow"]
     kw_max_avg_15 = report_json["response"]["kw_max_avg_15"]
     total_op_hours = common_functions.get_total_annual_operating_hours(report_json, dev)
@@ -58,14 +59,14 @@ def get_drain_selection_ids(eco_table_8_1_drain_input_json, report_id, dev):
 
     drain_selection_list = drain_selection_string.split(", ")
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     drains = report_json["response"]["drain"]
 
     selected_drain_ids = []
 
     for drain in drains:
-        drain_json = common_functions.get_req("drain", drain, dev)
+        drain_json = requests_util.get_req("drain", drain, dev)
         drain_number = drain_json["response"]["drain_number"]
         
         if drain_number in drain_selection_list:
@@ -85,7 +86,7 @@ def calculate_row(drain_selection_ids, peak_acfm_15min, kw_max_avg_15, eco_table
     dollars_per_year_list = []
 
     for drain_selection_id in drain_selection_ids:
-        drain_json = common_functions.get_req("drain", drain_selection_id, dev)
+        drain_json = requests_util.get_req("drain", drain_selection_id, dev)
         acfm_loss = drain_json["response"]["acfm_loss"]
 
         # Calculate kW Max & kW Demand
@@ -119,15 +120,15 @@ def calculate_row(drain_selection_ids, peak_acfm_15min, kw_max_avg_15, eco_table
     body = get_body(installed_total, incremental_total, kw_demand_total, kwh_per_year_total, o_and_m_total, dollars_per_year_total, incentive_total, payback_years_total)
 
     eco_table_8_1_id = eco_table_8_1_drain_input_json["response"]["eco_table_8_1"]
-    common_functions.patch_req("eco_table_8_1", eco_table_8_1_id, body, dev)
+    requests_util.patch_req("eco_table_8_1", eco_table_8_1_id, body, dev)
 
 def start_calculations(peak_acfm_15min, kw_max_avg_15, total_op_hours, dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev) # For retrieving dependencies
+    report_json = requests_util.get_req("report", report_id, dev) # For retrieving dependencies
 
     eco_table_8_1_drain_input_ids = report_json["response"]["eco_table_8_1_drain_input"]
 
     for eco_table_8_1_drain_input_id in eco_table_8_1_drain_input_ids:
-        eco_table_8_1_drain_input_json = common_functions.get_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input_id, dev)
+        eco_table_8_1_drain_input_json = requests_util.get_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input_id, dev)
 
         drain_selection_ids = get_drain_selection_ids(eco_table_8_1_drain_input_json, report_id, dev)
         print(f"drain_selection_ids: {drain_selection_ids}")

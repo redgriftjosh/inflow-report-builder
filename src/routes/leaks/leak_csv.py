@@ -1,13 +1,14 @@
 from routes import common_functions
 import json
 import sys
+from utilities import requests_util
 
 def delete_existing_leaks(leak_json, report_id, dev):
     try:
         leak_entries = leak_json["response"]["leak_entry"]
         for i, entry in enumerate(leak_entries):
-            common_functions.patch_req("Report", report_id, body={"loading": f"deleting existing leaks: {i+1}", "is_loading_error": "no"}, dev=dev)
-            common_functions.del_req("leak_entry", entry, dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"deleting existing leaks: {i+1}", "is_loading_error": "no"}, dev=dev)
+            requests_util.del_req("leak_entry", entry, dev)
     except:
         print(f"No existing leaks to delete  guess..")
 
@@ -26,10 +27,10 @@ def get_payload():
 
     report_id = data.get('report_id')
 
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
 
     leak_id = report_json["response"]["leak"]
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
 
     delete_existing_leaks(leak_json, report_id, dev)
 
@@ -97,7 +98,7 @@ def process_csv(csv_url, row_first, columns, leak_id):
 def get_columns(column_names, leak_id, dev):
     column_output_names = ["area", "category", "cfm", "date_leak_found", "euipment_shutdown_required", "fixed", "asset_id", "location", "note", "tagged", "uf"]
     columns = {}
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
     for i, column_name in enumerate(column_names):
         try:
             column_value = leak_json["response"][column_name]
@@ -125,16 +126,16 @@ def start():
     new_leak_ids = []
     for i, entry in enumerate(entries):
         try:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Creating New Leaks: {i+1}", "is_loading_error": "no"}, dev=dev)
-            response = common_functions.post_req("leak_entry", body=entry, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Creating New Leaks: {i+1}", "is_loading_error": "no"}, dev=dev)
+            response = requests_util.post_req("leak_entry", body=entry, dev=dev)
             new_leak_ids.append(response.get('id'))
         except:
             print(f"Error creating leak for row: {i+1}. Check to make sure number columns only contain numbers.", file=sys.stderr)
-            common_functions.patch_req("leak", leak_id, body={"leak_entry": new_leak_ids}, dev=dev)
+            requests_util.patch_req("leak", leak_id, body={"leak_entry": new_leak_ids}, dev=dev)
             sys.exit(1)
         
 
-    common_functions.patch_req("leak", leak_id, body={"leak_entry": new_leak_ids}, dev=dev)
+    requests_util.patch_req("leak", leak_id, body={"leak_entry": new_leak_ids}, dev=dev)
     leak = {
         "leak": leak_id,
         "area": "Hello"

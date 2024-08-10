@@ -2,6 +2,7 @@ import json
 import sys
 import common_functions
 import time
+from utilities import requests_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -31,29 +32,29 @@ def get_payload():
     return dev, report_id, eco_table_8_1_drain_input
 
 def add_drains_to_list(eco_table_8_1_drain_input, drain_options, dev):
-    common_functions.patch_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input, body={"drain_options": drain_options}, dev=dev)
+    requests_util.patch_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input, body={"drain_options": drain_options}, dev=dev)
 
-def add_drain(eco_table_8_1_drain_input_json, drain_id, dev):
-    # drain_selection_json = common_functions.get_req("drain_selection", drain_id, dev)
-    try:
-        # Check to see if we have any drains already selected
-        drain_selection = eco_table_8_1_drain_input_json["response"]["drain_selection"]
-    except:
-        # Assuming we don't have any drains so we'll mark them all as unchecked
+# def add_drain(eco_table_8_1_drain_input_json, drain_id, dev):
+#     # drain_selection_json = requests_util.get_req("drain_selection", drain_id, dev)
+#     try:
+#         # Check to see if we have any drains already selected
+#         drain_selection = eco_table_8_1_drain_input_json["response"]["drain_selection"]
+#     except:
+#         # Assuming we don't have any drains so we'll mark them all as unchecked
 
     
 
 def get_drains(report_id, eco_table_8_1_drain_input, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
-    eco_table_8_1_drain_input_json = common_functions.get_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
+    eco_table_8_1_drain_input_json = requests_util.get_req("eco_table_8_1_drain_input", eco_table_8_1_drain_input, dev)
 
     drain_ids = report_json["response"]["drain"]
 
     for drain_id in drain_ids:
-        drain_json = common_functions.get_req("drain", drain_id, dev)
+        drain_json = requests_util.get_req("drain", drain_id, dev)
         drain_number = drain_json["response"]["drain_number"]
 
-        add_drain(eco_table_8_1_drain_input_json, drain_id, dev)
+        # add_drain(eco_table_8_1_drain_input_json, drain_id, dev)
 
     
         

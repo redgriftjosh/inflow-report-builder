@@ -4,7 +4,7 @@ import json
 from eco_calculation import proposed_global
 import pandas as pd
 import numpy as np
-from utilities import compressor_util
+from utilities import compressor_util, requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -39,21 +39,21 @@ def get_payload():
     return dev, report_id, scenario_id
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
+    response = requests_util.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
     scenario_difference = response["id"]
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
 
     return scenario_difference
 
 def get_total_report_dryer_cfm(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     dryer_ids = report_json["response"]["dryer"]
 
     adjusted_cfms = []
     for dryer_id in dryer_ids:
-        dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        dryer_json = requests_util.get_req("dryer", dryer_id, dev)
         adjusted_cfm = dryer_json["response"]["scfm_dryer_loss"]
 
         adjusted_cfms.append(adjusted_cfm)
@@ -84,7 +84,7 @@ def get_ac_ids_for_dryer(report_json, connected_to, dev):
     connected_ac_ids = []
 
     for ac_id in ac_ids:
-        ac_json = common_functions.get_req("air_compressor", ac_id, dev)
+        ac_json = requests_util.get_req("air_compressor", ac_id, dev)
         name = ac_json["response"]["Customer CA"]
         
         if name in connected_to_list:
@@ -97,12 +97,12 @@ def get_cfm_df(report_json, ac_ids, dev):
     cfms = []
     master_df = None
     for idx, ac in enumerate(ac_ids):
-        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
         ac_name = ac_json["response"]["Customer CA"]
 
         if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
             ac_data_logger_id = ac_json["response"]["ac_data_logger"]
-            ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+            ac_data_logger_json = requests_util.get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
             # patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
@@ -225,17 +225,17 @@ def calculate_dryer_kw_row(acfm, full_load_kw, capacity_scfm):
     return slope * acfm + intercept
 
 def get_total_proposed_dryer_kw(report_id, scenario_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_proposed_json = requests_util.get_req("scenario_proposed", scenario_proposed_id, dev)
     dryer_ids = scenario_proposed_json["response"]["dryer"]
 
     kws = []
     for dryer_id in dryer_ids:
-        dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        dryer_json = requests_util.get_req("dryer", dryer_id, dev)
 
         connected_to = dryer_json["response"]["connected_to"]
         full_load_kw = dryer_json["response"]["full_load_kw"]
@@ -292,17 +292,17 @@ def get_cfm_loss_dpd(acfm, capacity_scfm, type):
         return cfm_loss
 
 def get_total_proposed_dryer_cfm(report_id, scenario_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_proposed_json = requests_util.get_req("scenario_proposed", scenario_proposed_id, dev)
     dryer_ids = scenario_proposed_json["response"]["dryer"]
 
     adjusted_cfms = []
     for dryer_id in dryer_ids:
-        dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        dryer_json = requests_util.get_req("dryer", dryer_id, dev)
 
         capacity_scfm = dryer_json["response"]["capacity_scfm"]
         type = dryer_json["response"]["type_if_desiccant_dryer"]
@@ -326,11 +326,11 @@ def get_total_proposed_dryer_cfm(report_id, scenario_id, dev):
     return total_proposed_dryer_cfm
 
 def get_op_ids(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
 
     scenario_proposed_id = scenario_json["response"]["scenario_proposed"]
 
-    scenario_proposed_json = common_functions.get_req("scenario_proposed", scenario_proposed_id, dev)
+    scenario_proposed_json = requests_util.get_req("scenario_proposed", scenario_proposed_id, dev)
 
     operating_period_ids = scenario_proposed_json["response"]["operation_period"]
 
@@ -370,13 +370,13 @@ def dpd_kw_calc(acfm, full_load_kw, capacity_scfm, dryer_json):
     return avg_kw
 
 def get_total_report_dryer_kw(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     dryer_ids = report_json["response"]["dryer"]
 
     kws = []
     for dryer_id in dryer_ids:
-        dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        dryer_json = requests_util.get_req("dryer", dryer_id, dev)
 
         connected_to = dryer_json["response"]["connected_to"]
         full_load_kw = dryer_json["response"]["full_load_kw"]
@@ -442,13 +442,13 @@ def start():
     operating_period_ids = get_op_ids(scenario_id, dev)
 
     for operating_period_id in operating_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         try:
             scenario_differences = operating_period_json["response"]["scenario_differences"]
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"dryer_cfm_change": total_dryer_cfm, "dryer_kw_change": total_dryer_kw}, dev=dev)
+        requests_util.patch_req("scenario_differences", scenario_differences, body={"dryer_cfm_change": total_dryer_cfm, "dryer_kw_change": total_dryer_kw}, dev=dev)
 
         proposed_global.update_op_stats(operating_period_id, report_id, dev)
 

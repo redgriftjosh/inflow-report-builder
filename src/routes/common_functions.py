@@ -11,7 +11,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import re
-from utilities import compressor_util
+from utilities import compressor_util, requests_util
 
 
 def clean_json(my_json, processed_ids=None, additional_keys=None):
@@ -62,63 +62,6 @@ def find_ids(my_json):
     
     return id_dict
 
-def get_req(type, id, dev):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
-
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-def get_list_req(type, dev):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}"
-
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-def del_req(type, id, dev):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
-
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    response = requests.delete(url, headers=headers)
-    response.raise_for_status()
-    return response.status_code
-
-def post_req(type, body, dev):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}"
-
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    response = requests.post(url, json=body, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-def patch_req(type, id, body, dev):
-    url = f"https://inflow-co.bubbleapps.io{dev}/api/1.1/obj/{type}/{id}"
-    
-    headers = {
-        "Authorization": "Bearer 6f8e90aff459852efde1bc77c672f6f1",
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.patch(url, json=body, headers=headers)
-        # print(f"patched: {body}, {response.status_code}")
-    except requests.RequestException as e:
-        print(e)
-
 def calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf):
     return min(round(amps * volts * (pf50 if amps < amppf else pf) * sqrt(3) / 1000, 2), bhp * 0.746)
 
@@ -129,19 +72,19 @@ def get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev):
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "setpoint-psig" in ac_json["response"]:
         setpoint_psig = ac_json["response"]["setpoint-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
 
@@ -154,17 +97,17 @@ def get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev):
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 3:
-            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     power_input_kws = []
     capacity_acfms = []
     kw_to_amps = []
     corrected_amps = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
@@ -173,7 +116,7 @@ def get_polynomial_vars_vriable_capacity(report_id, ac_json, volts, dev):
             capacity_acfm = slope_json["response"]["capacity-acfm"]
             capacity_acfms.append(capacity_acfm)
         else:
-            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     
         kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
@@ -195,13 +138,13 @@ def get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pres
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     correction_factor = 1 -((rated_psig - pressure) * 0.005)
@@ -215,17 +158,17 @@ def get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pres
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 3:
-            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     power_input_kws = []
     capacity_acfms = []
     kw_to_amps = []
     corrected_amps = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
@@ -234,7 +177,7 @@ def get_inverse_polynomial_vars_vriable_capacity(report_id, ac_json, volts, pres
             capacity_acfm = slope_json["response"]["capacity-acfm"]
             capacity_acfms.append(capacity_acfm)
         else:
-            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     
         kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
@@ -252,27 +195,27 @@ def get_max_kw_vfd(ac_json, report_id, dev):
     if "Customer CA" in ac_json["response"]:    
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 3:
-            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     power_input_kws = []
     for slope_entry_id in slope_entry_ids:
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
             power_input_kws.append(power_input_kw)
         else:
-            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
     return max(power_input_kws)
@@ -281,7 +224,7 @@ def get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setp
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     correction_factor = 1 -((rated_psig - pressure) * 0.005)
@@ -291,10 +234,10 @@ def get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setp
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 3:
-            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     power_input_kws = []
     capacity_acfms = []
@@ -302,7 +245,7 @@ def get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setp
     corrected_amps = []
     corrected_acfms = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
@@ -311,7 +254,7 @@ def get_inverse_polynomial_vars(report_id, ac_json, cfm, volts, rated_psig, setp
             capacity_acfm = slope_json["response"]["capacity-acfm"]
             capacity_acfms.append(capacity_acfm)
         else:
-            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     
         kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
@@ -336,19 +279,19 @@ def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "setpoint-psig" in ac_json["response"]:
         setpoint_psig = ac_json["response"]["setpoint-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
 
@@ -361,10 +304,10 @@ def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
     if "vfd_slope_entries" in ac_json["response"] and ac_json["response"]["vfd_slope_entries"] != []:
         slope_entry_ids = ac_json["response"]["vfd_slope_entries"]
         if len(slope_entry_ids) < 3:
-            patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"We need at least three Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     else:
-        patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We need at least two Power / Capacity Entries in VFD compressors! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     power_input_kws = []
     capacity_acfms = []
@@ -372,7 +315,7 @@ def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
     corrected_amps = []
     corrected_acfms = []
     for idx, slope_entry_id in enumerate(slope_entry_ids):
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         if "power-input-kw" in slope_json["response"] and "capacity-acfm" in slope_json["response"]:
             power_input_kw = slope_json["response"]["power-input-kw"]
@@ -381,7 +324,7 @@ def get_polynomial_vars(report_id, ac_json, cfm, volts, dev):
             capacity_acfm = slope_json["response"]["capacity-acfm"]
             capacity_acfms.append(capacity_acfm)
         else:
-            patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Incomplete Power / Capacity Entry! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     
         kw_to_amp = (1000 * power_input_kw) / (sqrt(3) * pf * volts)
@@ -409,26 +352,26 @@ def calculate_slope_intercept(report_id, ac_json, cfm, volts, dev):
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "setpoint-psig" in ac_json["response"]:
         setpoint_psig = ac_json["response"]["setpoint-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'Setpoint PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     correction_factor = 1 -((rated_psig - setpoint_psig) * 0.005)
     
     if "kw_at_full_load" in ac_json["response"]:
         kw_at_full_load = ac_json["response"]["kw_at_full_load"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "pf" in ac_json["response"]:
@@ -454,13 +397,13 @@ def calculate_inverse_slope_intercept(report_id, ac_json, cfm, volts, pressure, 
     if "Customer CA" in ac_json["response"]:
         ac_name = ac_json["response"]["Customer CA"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "rated-psig" in ac_json["response"]:
         rated_psig = ac_json["response"]["rated-psig"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing value: 'Rated PSIG'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     correction_factor = 1 -((rated_psig - pressure) * 0.005)
@@ -468,7 +411,7 @@ def calculate_inverse_slope_intercept(report_id, ac_json, cfm, volts, pressure, 
     if "kw_at_full_load" in ac_json["response"]:
         kw_at_full_load = ac_json["response"]["kw_at_full_load"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     
     if "pf" in ac_json["response"]:
@@ -515,7 +458,7 @@ def calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_i
         if "threshold-value" in ac_json["response"]:
             threshold = ac_json["response"]["threshold-value"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
         return df
@@ -535,7 +478,7 @@ def calculate_flow(df, control, cfm, volts, dev, idx, ac_name, ac_json, report_i
         df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_vfd_acfm(amps, a, b, c, min_amps, max_flow))
         return df
     else:
-        patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 def get_highest_cfm_from_slope_entries(ac_json, dev):
@@ -544,7 +487,7 @@ def get_highest_cfm_from_slope_entries(ac_json, dev):
     capacity_acfms = []
 
     for slope_entry_id in slope_entry_ids:
-        slope_json = get_req("vfd_slope_entries", slope_entry_id, dev)
+        slope_json = requests_util.get_req("vfd_slope_entries", slope_entry_id, dev)
         
         capacity_acfm = slope_json["response"]["capacity-acfm"]
         capacity_acfms.append(capacity_acfm)
@@ -554,7 +497,7 @@ def get_highest_cfm_from_slope_entries(ac_json, dev):
     return high_cfm
 
 def get_max_cfm(ac_id, dev):
-    ac_json = get_req("air_compressor", ac_id, dev)
+    ac_json = requests_util.get_req("air_compressor", ac_id, dev)
     control = ac_json["response"]["Control Type"]
 
     if control == "Variable Speed - VFD":
@@ -604,7 +547,7 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw
         print(f"psi_percent {psi_percent}")
         return (acfm * kw_per_cfm) * psi_percent
 
-    ac_json = get_req("air_compressor", ac_id, dev)
+    ac_json = requests_util.get_req("air_compressor", ac_id, dev)
     control = ac_json["response"]["Control Type"]
     ac_name = ac_json["response"]["Customer CA"]
 
@@ -704,7 +647,7 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw
         if "kw_at_full_load" in ac_json["response"]:
             kw_at_full_load = ac_json["response"]["kw_at_full_load"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Value: 'kw_at_full_load'! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
         slope, intercept = calculate_inverse_slope_intercept(report_id, ac_json, cfm, volts, pressure, dev)
@@ -730,14 +673,14 @@ def calculate_kw_from_flow(ac_id, report_id, pressure, pressure_change, acfm, kw
         return sum_product(idle_time, standby_time, standby_power, off_time, idle_kw, max_kw)
         
     else:
-        patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Cannot calculate Flow! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 def get_gal_per_cfm(ac_ids, report_id, dev):
 
     cfms = []
     for ac in ac_ids:
-        ac_json = get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
         control = ac_json["response"]["Control Type"]
 
         if control == "Variable Speed - VFD":
@@ -756,7 +699,7 @@ def get_gal_per_cfm(ac_ids, report_id, dev):
             slope_ids = ac_json["response"]["vfd_slope_entries"]
             slope_cfms = []
             for id in slope_ids:
-                slope_json = get_req("vfd_slope_entries", id, dev)
+                slope_json = requests_util.get_req("vfd_slope_entries", id, dev)
                 slope_cfm = slope_json["response"]["capacity-acfm"]
                 slope_cfms.append(slope_cfm)
             
@@ -764,7 +707,7 @@ def get_gal_per_cfm(ac_ids, report_id, dev):
             cfms.append(cfm)
     total_cfm = sum(cfms)
 
-    report_json = get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     try:
         storage_ids = report_json["response"]["storage_tank"] # SHOULD BE GETTING THESE FROM BASELINE 
@@ -774,7 +717,7 @@ def get_gal_per_cfm(ac_ids, report_id, dev):
     sizes = []
 
     for storage_id in storage_ids:
-        storage_json = get_req("storage_tank", storage_id, dev)
+        storage_json = requests_util.get_req("storage_tank", storage_id, dev)
         size = storage_json["response"]["size_in_gallons"]
         sizes.append(size)
     
@@ -786,13 +729,13 @@ def get_gal_per_cfm(ac_ids, report_id, dev):
 
 # Used in drains_4_3.py nvm
 def get_cost_to_operate(report_id, kw_demand_15min, kwh_annual, dev):
-    report_json = get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     try:
         elec_provider_id = report_json["response"]["electrical_provider"]
     except:
         print(f"Can't find any Electrical Utility info!", file=sys.stderr)
         sys.exit(1)
-    elec_provider_json = get_req("electrical_provider", elec_provider_id, dev)
+    elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
     on_peak_list = []
@@ -801,7 +744,7 @@ def get_cost_to_operate(report_id, kw_demand_15min, kwh_annual, dev):
     kwh_off_peak_list = []
 
     for elec_entry_id in elec_entry_ids:
-        elec_entry_json = get_req("electrical_provider_entry", elec_entry_id, dev)
+        elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
         month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
         month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
         kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
@@ -850,7 +793,7 @@ def get_cost_to_operate(report_id, kw_demand_15min, kwh_annual, dev):
 
 # gets start & end time for each day of the week returned in a dictionary.
 def weekly_dictionary(operating_period_id, dev):
-    operating_period_json = get_req("operation_period", operating_period_id, dev)
+    operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
 
     days = ["sun", "mon", "tues", "wed", "thurs", "fri", "sat"] # for easily getting the data from bubble -- works with the naming convention
     large_days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] # for 
@@ -871,7 +814,7 @@ def weekly_dictionary(operating_period_id, dev):
 # return the number of hours within the operating periods per year.
 # function is special for the daily operating periods.
 def hours_between(operating_period_id, dev):
-    operating_period_json = get_req("operation_period", operating_period_id, dev)
+    operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     today = datetime.today()
@@ -926,7 +869,7 @@ def weekly_operating_period(df, operating_period_id, dev):
 # takes a dataframe and an operating period ID and returns a filtered dataframe.
 # Designed for daily operating period not weekly.
 def daily_operating_period(df, operating_period_id, dev):
-    operating_period_json = get_req("operation_period", operating_period_id, dev)
+    operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
     start_time = datetime.strptime(operating_period_json["response"]["Start Time"], '%I:%M %p').time()
     end_time = datetime.strptime(operating_period_json["response"]["End Time"], '%I:%M %p').time()
     operating_period = operating_period_json["response"]["Name"]
@@ -977,7 +920,7 @@ def hours_between_weekly(operating_period_id, dev):
 # Get's the total number of minutes selected per week without duplicates for overlapping time ranges.
 # Can return just the total minutes or the weekly_schedule if you're comparing operating periods
 def minutes_between_experimental(op_id, dev):
-    op_json = get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
+    op_json = requests_util.get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
     time_ranges = op_json["response"]["time_range"] # List if time_range IDs
 
     # List of 10080 False values e.g. = [False, False, False, False, False, False...]
@@ -987,7 +930,7 @@ def minutes_between_experimental(op_id, dev):
 
     # For each time range in this operation period
     for time_range in time_ranges:
-        time_json = get_req("time_range", time_range, dev) # Get the json for each range
+        time_json = requests_util.get_req("time_range", time_range, dev) # Get the json for each range
         days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] # Will be used to carry over to the next day by adding 1 to the index
         days = time_json["response"]["repeat_on_weekly"] # Get's the list of days selected by the user.
 
@@ -1033,13 +976,13 @@ def minutes_between_experimental(op_id, dev):
                 
 # Migrating to data_crunch_util.py filter_df_to_each_operating_period
 def experimental_operating_period(df, op_id, dev):
-    op_json = get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
+    op_json = requests_util.get_req("operation_period", op_id, dev) # Get's a json object of all the time_range IDs
     time_ranges = op_json["response"]["time_range"] # List if time_range IDs
 
     filtered_dfs = []
     
     for time_range in time_ranges:
-        time_json = get_req("time_range", time_range, dev) # For each time range get the json for each range
+        time_json = requests_util.get_req("time_range", time_range, dev) # For each time range get the json for each range
         days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         days = time_json["response"]["repeat_on_weekly"]
 
@@ -1078,7 +1021,7 @@ def get_total_annual_operating_hours(report_json, dev):
         op_ids = report_json["response"]["operation_period"]
         hrs_yr = []
         for id in op_ids:
-            op_json = get_req("operation_period", id, dev)
+            op_json = requests_util.get_req("operation_period", id, dev)
             hrs = op_json["response"]["Hours/yr"]
             hrs_yr.append(hrs)
         
@@ -1102,13 +1045,13 @@ def get_total_annual_operating_hours(report_json, dev):
 def get_pressure_csvs(report_id, pressure_ids, dev):
     pressure_csvs = {}
     for pressure_id in pressure_ids:
-        pressure_json = get_req("pressure_sensor", pressure_id, dev)
+        pressure_json = requests_util.get_req("pressure_sensor", pressure_id, dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
             pressure_csvs[pressure_id] = pressure_csv
         else:
-            patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
     return pressure_csvs
 
@@ -1141,7 +1084,7 @@ def trim_df(report_json, df, dev):
     try:
         trim_id = report_json["response"]["trim"]
         report_id = report_json["response"]["_id"]
-        trim_json = get_req("trim", trim_id, dev)
+        trim_json = requests_util.get_req("trim", trim_id, dev)
 
         start_date = datetime.strptime(trim_json["response"]["start_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
         start_time = datetime.strptime(trim_json["response"]["start_time"], "%I:%M %p")
@@ -1155,7 +1098,7 @@ def trim_df(report_json, df, dev):
 
         return df
     except:
-        patch_req("Report", report_id, body={"loading": f"We're having some trouble Trimming your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We're having some trouble Trimming your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 # PHASING THIS OUT MOVING TO data_crunch_util.py
@@ -1170,7 +1113,7 @@ def exclude_from_df(df, report_json, dev):
 
         # Add each exclusion to the mask
         for exclusion_id in exclusion_ids:
-            exclusion_json = get_req("exclusion", exclusion_id, dev)
+            exclusion_json = requests_util.get_req("exclusion", exclusion_id, dev)
             start_date = datetime.strptime(exclusion_json["response"]["start_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
             start_time = datetime.strptime(exclusion_json["response"]["start_time"], "%I:%M %p")
             start = start_date.replace(hour=start_time.hour, minute=start_time.minute)
@@ -1184,7 +1127,7 @@ def exclude_from_df(df, report_json, dev):
         # Use the inverse of the mask to filter the dataframe
         return df[~exclusion_mask]
     except:
-        patch_req("Report", report_id, body={"loading": f"We're having some trouble removing Exclusions from your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We're having some trouble removing Exclusions from your dataset. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 def sanitize_filename(filename):
@@ -1199,7 +1142,7 @@ def sanitize_filename(filename):
 def get_header_id(report_json, dev):
     pressure_ids = report_json["response"]["pressure_sensor"]
     for pressure in pressure_ids:
-        pressure_json = get_req("pressure_sensor", pressure, dev)
+        pressure_json = requests_util.get_req("pressure_sensor", pressure, dev)
         header = pressure_json["response"]["header"]
         if header == True:
             return pressure
@@ -1236,12 +1179,12 @@ def get_pressure_peaks(report_id, report_json, master_df_pressure, dev):
 
     pressure_peaks = {}
     for id in pressure_ids:
-        pressure_json = get_req("pressure_sensor", id, dev)
+        pressure_json = requests_util.get_req("pressure_sensor", id, dev)
         if "csv-psig" in pressure_json["response"]:
             pressure_csv = pressure_json["response"]["csv-psig"]
             pressure_csv = f"https:{pressure_csv}"
         else:
-            patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
         df = csv_to_df(pressure_csv) # convert csv_url to dataframe
@@ -1278,13 +1221,13 @@ def get_pressure_peaks(report_id, report_json, master_df_pressure, dev):
 def get_avg_pressures(report_id, report_json, dev):
     pressure_ids = report_json["response"]["pressure_sensor"]
 
-    patch_req("Report", report_id, body={"loading": f"Reading Pressure CSVs...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Reading Pressure CSVs...", "is_loading_error": "no"}, dev=dev)
     pressure_csvs = get_pressure_csvs(report_id, pressure_ids, dev) # Returns an dictionary = {pressure_id: csv_url, etc..}
 
     operating_period_ids = report_json["response"]["operation_period"] # array of operating_period_ids
     op_per_type = report_json["response"]["operating_period_type"] # can be "Daily" or "Weekly"
 
-    patch_req("Report", report_id, body={"loading": f"Calculating Average Pressure for each Pressure Log in each Operating Period...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Calculating Average Pressure for each Pressure Log in each Operating Period...", "is_loading_error": "no"}, dev=dev)
     op_per_avg_pressures = {} # will hold {operating_period_id: {pressure_id: avg_pressure}, etc..}
     if op_per_type == "Daily":
 
@@ -1398,7 +1341,7 @@ def get_low_15_min_acfm(df, report_json):
     return low_avg_15
 
 def add_pressure_to_master_df(master_df, report_id, dev):
-    report_json = get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     master_df_pressure = None
 
@@ -1427,87 +1370,87 @@ def add_pressure_to_master_df(master_df, report_id, dev):
         return None
 
 def compile_master_df(report_id, dev):
-    report_json = get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
         ac_ids = report_json["response"]["air_compressor"]
     else:
-        patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     my_dict = {}
 
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
 
         if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
             ac_data_logger_id = ac_json["response"]["ac_data_logger"]
-            ac_data_logger_json = get_req("ac_data_logger", ac_data_logger_id, dev)
+            ac_data_logger_json = requests_util.get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
         if "CSV" in ac_data_logger_json["response"]:
             csv_url = ac_data_logger_json["response"]["CSV"]
             csv_url = f"https:{csv_url}"
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
-        patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
         df = csv_to_df(csv_url)
         # response = requests.get(csv_url) # Step 2: Download the CSV file
         # response.raise_for_status() # Check that the request was successful
             
         # csv_data = StringIO(response.text) # Convert CSV into text of some sort
         # df = pd.read_csv(csv_data, skiprows=1, parse_dates=[1], date_format='%m/%d/%y %I:%M:%S %p') # Step 3: Read the CSV data into a pandas DataFrame and format the date column
-        patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
         if "volts" in ac_json["response"]:
             volts = ac_json["response"]["volts"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "pf if fifty" in ac_json["response"]:
             pf50 = ac_json["response"]["pf if fifty"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "pf" in ac_json["response"]:
             pf = ac_json["response"]["pf"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "amps less pf" in ac_json["response"]:
             amppf = ac_json["response"]["amps less pf"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "BHP" in ac_json["response"]:
             bhp = ac_json["response"]["BHP"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         df[f"Kilowatts{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
 
-        patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
         # Create ACFM Column
 
         if "Control Type" in ac_json["response"]:
             control = ac_json["response"]["Control Type"]
         else:
-            patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
         cfms.append(cfm)
@@ -1516,7 +1459,7 @@ def compile_master_df(report_id, dev):
         #     cfm = ac_json["response"]["CFM"] # Used as "CFM" in OLOL calcs and "Max CFM at setpoint psig" in VFD calcs
         #     cfms.append(cfm)
         # elif control != "Fixed Speed - Variable Capacity":
-        #     patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #     requests_util.patch_req("Report", report_id, body={"loading": f"Missing CFM! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         #     sys.exit(1)
         # else:
         #     cfm = 1
@@ -1527,7 +1470,7 @@ def compile_master_df(report_id, dev):
         #     if "threshold-value" in ac_json["response"]:
         #         threshold = ac_json["response"]["threshold-value"]
         #     else:
-        #         patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+        #         requests_util.patch_req("Report", report_id, body={"loading": f"Missing Threshold Value! This is needed for ACFM calculations on OLOL control types. Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
         #         sys.exit()
         #     df[f"ACFM{idx+1}"] = df.iloc[:, 2].apply(lambda amps: calculate_olol_acfm(amps, threshold, cfm))
         # elif control == "VFD":
@@ -1546,7 +1489,7 @@ def compile_master_df(report_id, dev):
             print("added first DataFrame to master_df")
         else:
             master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
-            patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
     master_df.info()
@@ -1558,7 +1501,7 @@ def compile_master_df(report_id, dev):
     master_df_pressure = add_pressure_to_master_df(master_df, report_id, dev)
 
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
-        patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = trim_df(report_json, master_df, dev)
         # master_df_pressure = trim_df(report_json, master_df, dev)
 
@@ -1566,7 +1509,7 @@ def compile_master_df(report_id, dev):
     print("Added: master_df")
 
     if "exclusion" in report_json["response"]:
-        patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Removing Exclusiong from the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = exclude_from_df(master_df, report_json, dev)
         # master_df_pressure = exclude_from_df(master_df, report_json, dev)
     
@@ -1576,7 +1519,7 @@ def compile_master_df(report_id, dev):
         op_per_type = report_json["response"]["operating_period_type"]
         
         operating_period_ids = report_json["response"]["operation_period"]
-        patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(ac_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
         sys.exit(1)

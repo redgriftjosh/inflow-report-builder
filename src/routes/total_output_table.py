@@ -5,6 +5,7 @@ import csv
 import base64
 import pandas as pd
 import requests
+from utilities import requests_util
 
 def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
     # take the report_json with only objects e.g. {'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021'], 'trim': '098732490873x298374210398701'}
@@ -13,7 +14,7 @@ def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
     for key, value in my_json.items():
 
         try:
-            common_functions.patch_req("report", report_id, body={'loading': f"Getting Values from: {key}", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("report", report_id, body={'loading': f"Getting Values from: {key}", "is_loading_error": "no"}, dev=dev)
         except:
             print(f"Could not update loading text: {key}")
         # Check if the value is an array e.g. ['12398467x219083473243224', '10843759387x0293481029374021']
@@ -26,7 +27,7 @@ def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
                 processed_ids.append(id)
 
                 # Get the json for that object id
-                my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
+                my_thing = requests_util.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
                 # print(f"get_things - {iteration}: {my_thing}")
                 # print('')
                 
@@ -55,7 +56,7 @@ def get_things(my_json, report_id, processed_ids, iteration, total_output, dev):
             processed_ids.append(value)
 
             # Get the json for that object id
-            my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
+            my_thing = requests_util.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
             # print(f"get_things - {iteration}: {my_thing}")
             # print('')
             
@@ -107,7 +108,7 @@ def start():
 
     iteration = 0
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     # print(f"1 - Dirty Report Json: {report_json}")
     # print('')
@@ -117,7 +118,7 @@ def start():
         # print(f"1 - Cleaned Report Json & Added to Total Output: {report_json}")
         # print('')
     except:
-        common_functions.patch_req("report", report_id, body={'loading': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("report", report_id, body={'loading': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     try:
@@ -125,7 +126,7 @@ def start():
         # print(f"1 - ONLY IDS: {things_json}")
         # print('')
     except:
-        common_functions.patch_req("report", report_id, body={'loading': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("report", report_id, body={'loading': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if things_json:
@@ -187,6 +188,6 @@ def start():
     except requests.RequestException as e:
         print(e)
     
-    common_functions.patch_req("report", report_id, body={'loading': f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("report", report_id, body={'loading': f"Success!", "is_loading_error": "no"}, dev=dev)
 
 start()

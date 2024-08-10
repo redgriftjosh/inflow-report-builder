@@ -9,6 +9,7 @@ import plotly.io as pio
 import base64
 import urllib.parse
 import requests
+from utilities import requests_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -32,14 +33,14 @@ def get_payload():
     return dev, report_id
 
 def get_dependencies(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     section_5 = report_json["response"]["section_5"]
-    section_5_json = common_functions.get_req("section_5", section_5, dev)
+    section_5_json = requests_util.get_req("section_5", section_5, dev)
 
     section_5_2 = section_5_json["response"]["section_5_2"]
 
-    section_5_2_json = common_functions.get_req("section_5_2", section_5_2, dev)
+    section_5_2_json = requests_util.get_req("section_5_2", section_5_2, dev)
 
     try:
         low_psi = section_5_2_json["response"]["low_psi"]
@@ -55,22 +56,22 @@ def get_dependencies(report_id, dev):
     return threshold_psi, low_psi, section_5_2
 
 def get_df(dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     header_id = common_functions.get_header_id(report_json, dev)
 
-    pressure_json = common_functions.get_req("pressure_sensor", header_id, dev)
+    pressure_json = requests_util.get_req("pressure_sensor", header_id, dev)
     if "csv-psig" in pressure_json["response"]:
         pressure_csv = pressure_json["response"]["csv-psig"]
         pressure_csv = f"https:{pressure_csv}"
     else:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
-    common_functions.patch_req("Report", report_id, body={"loading": f"Reading CSV...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Reading CSV...", "is_loading_error": "no"}, dev=dev)
     df = common_functions.csv_to_df(pressure_csv)
 
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         df = common_functions.trim_df(report_json, df, dev)
 
     return df
@@ -89,11 +90,11 @@ def filter_selection(df, start_date, start_time, end_date, end_time, report_id, 
 
         return df
     except:
-        common_functions.patch_req("Report", report_id, body={"loading": f"We're having some trouble Selecting the timerange you specified. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"We're having some trouble Selecting the timerange you specified. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, avg_pressure, dev):
-    common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Generating Graph...", "is_loading_error": "no"}, dev=dev)
 
     # avg_pressure = df.iloc[:, 2][df.iloc[:, 2] >= threshold_psi].mean()
 
@@ -177,27 +178,27 @@ def create_graph(df, report_id, threshold_psi, low_psi, section_5_2, avg_pressur
     response = requests.patch(url, json=payload, headers=headers)
     # print(response.text)
     print(f"acfm_graph_3_min() {response.status_code, response.text}")
-    common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 # Gets the header pressure dataframe
 def get_pressure_df(dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     
     if "pressure_sensor" in report_json["response"]:
         pressure_sensors = report_json["response"]["pressure_sensor"]
         for sensor in pressure_sensors:
-            pressure_json = common_functions.get_req("pressure_sensor", sensor, dev)
+            pressure_json = requests_util.get_req("pressure_sensor", sensor, dev)
             if pressure_json["response"]["header"] == True:
                 if "csv-psig" in pressure_json["response"]:
                     pressure_csv = pressure_json["response"]["csv-psig"]
                     pressure_csv = f"https:{pressure_csv}"
                     return common_functions.csv_to_df(pressure_csv)
                 else:
-                    common_functions.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
+                    requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find Pressure CSV! Make sure all pressure sensors added have a CSV Uploaded", "is_loading_error": "yes"}, dev=dev)
                     sys.exit()
 
 def filter_df(df, report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
 
@@ -207,7 +208,7 @@ def filter_df(df, report_id, dev):
 
         
         operating_period_ids = report_json["response"]["operation_period"]
-        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
         sys.exit(1)
@@ -227,7 +228,7 @@ def filter_df(df, report_id, dev):
     return master_df
 
 def get_avg_pressure(dev, report_id):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     # 1. Get the header pressure csv
     df = get_pressure_df(dev, report_id) # ""rEdUnDaNt""", I know. Fix it if you want but the client won't care either.

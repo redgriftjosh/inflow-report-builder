@@ -8,10 +8,10 @@ import requests
 import common_functions
 import plotly.graph_objects as go
 import numpy as np
-from utilities import compressor_util
+from utilities import compressor_util, requests_util
 
 def add_header_pressure_to_master_df(master_df, report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     master_df_pressure = None
 
@@ -20,7 +20,7 @@ def add_header_pressure_to_master_df(master_df, report_id, dev):
     if "pressure_sensor" in report_json["response"]:
         pressure_sensors = report_json["response"]["pressure_sensor"]
         for pressure_sensor in pressure_sensors:
-            pressure_sensor_json = common_functions.get_req("pressure_sensor", pressure_sensor, dev)
+            pressure_sensor_json = requests_util.get_req("pressure_sensor", pressure_sensor, dev)
 
             if pressure_sensor_json["response"]["header"]:
                 pressure_csv = pressure_sensor_json["response"]["csv-psig"]
@@ -44,83 +44,83 @@ def add_header_pressure_to_master_df(master_df, report_id, dev):
         return master_df
 
 def compile_df(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     if "air_compressor" in report_json["response"] and report_json["response"]["air_compressor"] != []:
         ac_ids = report_json["response"]["air_compressor"]
     else:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Unable to find any Air Compressors! You need at least one Air Compressor for this Chart.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
     my_dict = {}
 
     master_df = None
     cfms = []
     for idx, ac in enumerate(ac_ids):
-        ac_json = common_functions.get_req("air_compressor", ac, dev)
+        ac_json = requests_util.get_req("air_compressor", ac, dev)
         if "Customer CA" in ac_json["response"]:
             ac_name = ac_json["response"]["Customer CA"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Name! Air Compressor ID: {ac}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
-        common_functions.patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Getting started on {ac_name}...", "is_loading_error": "no"}, dev=dev)
 
         if "ac_data_logger" in ac_json["response"] and ac_json["response"]["ac_data_logger"] != []:
             ac_data_logger_id = ac_json["response"]["ac_data_logger"]
-            ac_data_logger_json = common_functions.get_req("ac_data_logger", ac_data_logger_id, dev)
+            ac_data_logger_json = requests_util.get_req("ac_data_logger", ac_data_logger_id, dev)
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
         if "CSV" in ac_data_logger_json["response"]:
             csv_url = ac_data_logger_json["response"]["CSV"]
             csv_url = f"https:{csv_url}"
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Data Logger! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
 
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Reading CSV...", "is_loading_error": "no"}, dev=dev)
         df = common_functions.csv_to_df(csv_url)
 
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Kilowatts{idx+1} Column...", "is_loading_error": "no"}, dev=dev)
         if "volts" in ac_json["response"]:
             volts = ac_json["response"]["volts"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Volts! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "pf if fifty" in ac_json["response"]:
             pf50 = ac_json["response"]["pf if fifty"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Power Factor When Less Than 50% Load! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "pf" in ac_json["response"]:
             pf = ac_json["response"]["pf"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "amps less pf" in ac_json["response"]:
             amppf = ac_json["response"]["amps less pf"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Amps Less Than For Power Factor! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         if "BHP" in ac_json["response"]:
             bhp = ac_json["response"]["BHP"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing BHP! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         df[f"Kilowatts{idx+1}"] = df.iloc[:, 2].apply(lambda amps: common_functions.calculate_kilowatts(amps, volts, pf50, amppf, bhp, pf))
 
-        common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: ACFM Column...", "is_loading_error": "no"}, dev=dev)
         # Create ACFM Column
 
         if "Control Type" in ac_json["response"]:
             control = ac_json["response"]["Control Type"]
         else:
-            common_functions.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"Missing Control Type! Air Compressor: {ac_name}", "is_loading_error": "yes"}, dev=dev)
             sys.exit()
         
         cfm = compressor_util.get_cfm(control, ac_json, ac_name, dev)
@@ -140,13 +140,13 @@ def compile_df(report_id, dev):
             print("added first DataFrame to master_df")
         else:
             master_df = pd.merge(master_df, df, left_on=f"Date{idx}", right_on=f"Date{idx+1}", how="outer")
-            common_functions.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("Report", report_id, body={"loading": f"{ac_name}: Merging with other CSVs...", "is_loading_error": "no"}, dev=dev)
             print("Merged next Dataframe with master_df")
     
     master_df_pressure = add_header_pressure_to_master_df(master_df, report_id, dev)
 
     if "trim" in report_json["response"] and report_json["response"]["trim"] != []:
-        common_functions.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Trimming the dataset...", "is_loading_error": "no"}, dev=dev)
         master_df = common_functions.trim_df(report_json, master_df, dev)
         # master_df_pressure = trim_df(report_json, master_df, dev)
 
@@ -165,7 +165,7 @@ def get_next_order(report_json, dev):
     return next_order
 
 def generate_graph(df, graph_id, dev, kw_period, acfm_period, pressure_period):
-    # common_functions.patch_req("Report", report_id, body={"loading": f"Generating Graph: ACFM Monitoring Period...", "is_loading_error": "no"}, dev=dev)
+    # requests_util.patch_req("Report", report_id, body={"loading": f"Generating Graph: ACFM Monitoring Period...", "is_loading_error": "no"}, dev=dev)
 
     fig = go.Figure()
 
@@ -277,7 +277,7 @@ def generate_graph(df, graph_id, dev, kw_period, acfm_period, pressure_period):
 
     encoded_image_data = base64.b64encode(image_data).decode('utf-8')
 
-    # report_json = common_functions.get_req("Report", report_id, dev) # Get the Report Object
+    # report_json = requests_util.get_req("Report", report_id, dev) # Get the Report Object
 
 
     payload = {
@@ -310,11 +310,11 @@ def generate_graph(df, graph_id, dev, kw_period, acfm_period, pressure_period):
     # all_ids = existing_ids + [appendix_graph_id]
     # # print(F"all_ids: {all_ids}")
 
-    # common_functions.patch_req("report", report_id, body={"appendix_graph": all_ids}, dev=dev) # Update the report with the new id if the graph we just created
-    # common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    # requests_util.patch_req("report", report_id, body={"appendix_graph": all_ids}, dev=dev) # Update the report with the new id if the graph we just created
+    # requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 def trim_df_to_selection(report_id, df, dev, day_start, day_end, time_start, time_end):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     report_id = report_json["response"]["_id"]
 
@@ -331,7 +331,7 @@ def trim_df_to_selection(report_id, df, dev, day_start, day_end, time_start, tim
     return df
     # try:
     # except:
-    #     common_functions.patch_req("Report", report_id, body={"loading": f"We're having some trouble with your date selection. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
+    #     requests_util.patch_req("Report", report_id, body={"loading": f"We're having some trouble with your date selection. Make sure the times are formatted exactly like '9:00 AM'.", "is_loading_error": "yes"}, dev=dev)
     #     sys.exit()
 
 def start():
@@ -346,7 +346,7 @@ def start():
     graph_id = data.get('graph_id')
     print(f"graph_id: {graph_id}")
 
-    appendix_graph_json = common_functions.get_req("appendix_graph", graph_id, dev)
+    appendix_graph_json = requests_util.get_req("appendix_graph", graph_id, dev)
     print(f"appendix_graph_json: {appendix_graph_json}")
 
     day_start = appendix_graph_json.get('response').get('day_start')

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from eco_calculation import baseline_global
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -36,7 +37,7 @@ def get_payload():
     return dev, report_id, scenario_id
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={
+    response = requests_util.post_req("scenario_differences", body={
         "operation_period": op_id, 
         "compressor_kw_change": 0,
         "dryer_kw_change": 0,
@@ -48,21 +49,21 @@ def create_new_scenario_difference(op_id, dev):
 
     scenario_difference = response["id"]
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
 
     return scenario_difference
 
 def get_total_report_leak_cfm(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     leak_id = report_json["response"]["leak"]
 
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
 
     leak_entry_ids = leak_json["response"]["leak_entry"]
 
     adjusted_cfms = []
     for entry in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
+        leak_entry_json = requests_util.get_req("leak_entry", entry, dev)
         fixed = leak_entry_json["response"]["fixed"]
         print(f"fixed - report: {fixed}")
 
@@ -76,19 +77,19 @@ def get_total_report_leak_cfm(report_id, dev):
     return total_report_leak_cfm
 
 def get_total_baseline_leak_cfm(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_baseline_json = requests_util.get_req("scenario_baseline", scenario_baseline_id, dev)
     leak_id = scenario_baseline_json["response"]["leak"]
 
-    leak_json = common_functions.get_req("leak", leak_id, dev)
+    leak_json = requests_util.get_req("leak", leak_id, dev)
 
     leak_entry_ids = leak_json["response"]["leak_entry"]
 
     adjusted_cfms = []
     for entry in leak_entry_ids:
-        leak_entry_json = common_functions.get_req("leak_entry", entry, dev)
+        leak_entry_json = requests_util.get_req("leak_entry", entry, dev)
         fixed = leak_entry_json["response"]["fixed"]
         print(f"fixed - baseline: {fixed}")
 
@@ -102,11 +103,11 @@ def get_total_baseline_leak_cfm(scenario_id, dev):
     return total_baseline_leak_cfm
 
 def get_op_ids(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
 
     scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_baseline_json = requests_util.get_req("scenario_baseline", scenario_baseline_id, dev)
 
     operating_period_ids = scenario_baseline_json["response"]["operation_period"]
 
@@ -127,13 +128,13 @@ def start():
     operating_period_ids = get_op_ids(scenario_id, dev)
 
     for operating_period_id in operating_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         try:
             scenario_differences = operating_period_json["response"]["scenario_differences"]
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"leak_cfm_change": total_leak_cfm}, dev=dev)
+        requests_util.patch_req("scenario_differences", scenario_differences, body={"leak_cfm_change": total_leak_cfm}, dev=dev)
 
         baseline_global.update_op_stats(operating_period_id, report_id, dev)
 

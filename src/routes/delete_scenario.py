@@ -2,6 +2,7 @@ import common_functions
 import sys
 import json
 import re
+from utilities import requests_util
 
 def get_payload():
     data = json.loads(sys.argv[1])
@@ -28,7 +29,7 @@ def get_payload():
         print(f"Can't find variable: scenario_id", file=sys.stderr)
         sys.exit(1)
     
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     try:
         created_by_user_id = report_json["response"]["Created By"]
@@ -106,7 +107,7 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
     # for each object attached to the report... e.g. 'air_compressors': ['12398467x219083473243224', '10843759387x0293481029374021']
     for key, value in my_json.items():
         try:
-            common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Deleting: {key}", "is_loading_error": "no"}, dev=dev)
+            requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"Deleting: {key}", "is_loading_error": "no"}, dev=dev)
         except:
             print(f"Could not update loading text: {key}")
         # Check if the value is an array e.g. ['12398467x219083473243224', '10843759387x0293481029374021']
@@ -119,7 +120,7 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
 
 
                 # Get the json for that object id
-                my_thing = common_functions.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
+                my_thing = requests_util.get_req(key, id, dev) # Will only work if all things are named the same as they're referenced
                 # print(f"delete_things - {iteration}: {my_thing}")
                 # print('')
                 
@@ -139,7 +140,7 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                     print('No more things to delete here')
                     print('')
                 
-                response = common_functions.del_req(key, id, dev)
+                response = requests_util.del_req(key, id, dev)
                 # print(f"delete_things - {iteration} - del_req: {response}")
                 # print('')
                 # print('')
@@ -150,7 +151,7 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
             processed_ids.append(value)
 
             # Get the json for that object id
-            my_thing = common_functions.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
+            my_thing = requests_util.get_req(key, value, dev) # Will only work if all things are named the same as they're referenced
             # print(f"delete_things - {iteration}: {my_thing}")
             # print('')
             
@@ -170,7 +171,7 @@ def delete_things(my_json, created_by_user_id, processed_ids, iteration, dev):
                 print('No more things to delete here')
                 print('')
             
-            response = common_functions.del_req(key, value, dev)
+            response = requests_util.del_req(key, value, dev)
             # print(f"delete_things - {iteration} - del_req: {response}")
             # print('')
             # print('')
@@ -184,9 +185,9 @@ def start():
 
     iteration = 0
 
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     created_by_user_id = report_json["response"]["created_by_user_id"]
 
     # print(f"1 - Dirty Report Json: {report_json}")
@@ -196,7 +197,7 @@ def start():
         # print(f"1 - Cleaned Report Json: {report_json}")
         # print('')
     except:
-        common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"trouble cleaning report_json (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     try:
@@ -204,7 +205,7 @@ def start():
         # print(f"1 - ONLY IDS: {things_json}")
         # print('')
     except:
-        common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"trouble with find_ids (Josh's Problem)", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
     if things_json:
@@ -213,9 +214,9 @@ def start():
 
     # print(f"1 - deleting report: {report_json}")
     # print('')
-    response = common_functions.del_req("scenario", scenario_id, dev)
+    response = requests_util.del_req("scenario", scenario_id, dev)
     # print(f"del_req report: {response}")
     
-    common_functions.patch_req("User", created_by_user_id, body={'loading_text': f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("User", created_by_user_id, body={'loading_text': f"Success!", "is_loading_error": "no"}, dev=dev)
 
 start()

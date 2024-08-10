@@ -6,35 +6,14 @@ from routes import common_functions
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from utilities import data_crunch_util, financial_util, dryers_util
+from utilities import data_crunch_util, financial_util, dryers_util, requests_util, pressure_util
 
-
-
-def get_pressure_index(report_id, op_json, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
-    baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
-
-    try:
-        p_what = baseline_operation_7_1_json["response"]["p_what"]
-    except:
-        print(f"No Pressure Selected...", file=sys.stderr)
-        sys.exit(1)
-    
-    try:
-        i = int(p_what.replace("P", ""))-1
-        pressure = op_json["response"]["P2"][i]
-        return pressure
-    except:
-        common_functions.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
-        print(f"Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like: P4", file=sys.stderr)
-        sys.exit(1)
 
 def get_kw_demand_15min(report_json, op_json, dev):
     kw_demand_15min = report_json["response"]["kw_max_avg_15"]
 
     scenario_differences_id = op_json["response"]["scenario_differences"]
-    scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
+    scenario_differences_json = requests_util.get_req("scenario_differences", scenario_differences_id, dev)
     
     try:
         compressor_kw_change = scenario_differences_json["response"]["compressor_peak_kw_change"]
@@ -55,7 +34,7 @@ def get_kw_demand_15min(report_json, op_json, dev):
 def pressure_difference(pressure, op_json, dev):
 
     scenario_differences_id = op_json["response"]["scenario_differences"]
-    scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
+    scenario_differences_json = requests_util.get_req("scenario_differences", scenario_differences_id, dev)
     
     try:
         filter_psi_change = scenario_differences_json["response"]["filter_psi_change"]
@@ -69,7 +48,7 @@ def get_peak_15_acfm(op_json, dev):
     peak_15min_acfm = op_json["response"]["peak_15min_acfm"]
 
     scenario_differences_id = op_json["response"]["scenario_differences"]
-    scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
+    scenario_differences_json = requests_util.get_req("scenario_differences", scenario_differences_id, dev)
     
     try:
         leak_cfm_change = scenario_differences_json["response"]["dryer_cfm_change"]
@@ -102,7 +81,7 @@ def calculate_row(report_json, demand_schedule_id, op_id, op_json, baseline_oper
     
     report_id = report_json["response"]["_id"]
 
-    pressure = get_pressure_index(report_id, op_json, dev)
+    pressure = pressure_util.get_pressure_index(report_id, op_json, dev)
 
     if scope: # If the scope os not None, it'll be "proposed" or "baseline"
         pressure = pressure_difference(pressure, op_json, dev)
@@ -167,7 +146,7 @@ def calculate_row(report_json, demand_schedule_id, op_id, op_json, baseline_oper
     if demand_schedule_id == op_id:
         body["kw_demand_15min"] = kw_demand_15min
 
-    response = common_functions.post_req("baseline_operation_7_1_row", body, dev)
+    response = requests_util.post_req("baseline_operation_7_1_row", body, dev)
 
     print(f"ROW POST REQ RESPONSE: {response}")
     row_id = response["id"]
@@ -195,7 +174,7 @@ def calculate_dryer_row(report_json, baseline_operation_7_1, kw, kw_demand_15min
         "label": label
     }
 
-    response = common_functions.post_req("baseline_operation_7_1_row", body, dev)
+    response = requests_util.post_req("baseline_operation_7_1_row", body, dev)
 
     print(f"ROW POST REQ RESPONSE: {response}")
     row_id = response["id"]
@@ -204,12 +183,12 @@ def calculate_dryer_row(report_json, baseline_operation_7_1, kw, kw_demand_15min
 
 def get_report_dryer_kw(report_json, dev):
     baseline_operation_7_1 = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1, dev)
 
     baseline_operation_7_1_rows = baseline_operation_7_1_json["response"]["baseline_operation_7_1_row"]
 
     for row in baseline_operation_7_1_rows:
-        row_json = common_functions.get_req("baseline_operation_7_1_row", row, dev)
+        row_json = requests_util.get_req("baseline_operation_7_1_row", row, dev)
         label = row_json["response"]["label"]
 
         if label == "Dryers":
@@ -223,10 +202,10 @@ def calculate_dryer_scenario(report_json, operation_period_ids, baseline_operati
     dryer_kw_changes = []
     dryer_peak_kw_changes = []
     for operation_period_id in operation_period_ids:
-        op_json = common_functions.get_req("operation_period", operation_period_id, dev)
+        op_json = requests_util.get_req("operation_period", operation_period_id, dev)
 
         scenario_differences_id = op_json["response"]["scenario_differences"]
-        scenario_differences_json = common_functions.get_req("scenario_differences", scenario_differences_id, dev)
+        scenario_differences_json = requests_util.get_req("scenario_differences", scenario_differences_id, dev)
 
         try:
             dryer_kw_change = scenario_differences_json["response"]["dryer_kw_change"]
@@ -270,7 +249,7 @@ def calculate_dryer_report(report_json, baseline_operation_7_1, dev):
     demand_kws = []
 
     for dryer_id in dryer_ids:
-        dryer_json = common_functions.get_req("dryer", dryer_id, dev)
+        dryer_json = requests_util.get_req("dryer", dryer_id, dev)
         try:
             connected_to = dryer_json["response"]["connected_to"]
             full_load_kw = dryer_json["response"]["full_load_kw"]
@@ -320,7 +299,7 @@ def calculate_dryer_report(report_json, baseline_operation_7_1, dev):
         else:
             cfm_loss = dryers_util.get_dryer_cfm_loss(capacity_scfm, type)
         
-        common_functions.patch_req("dryer", dryer_id, body={"scfm_dryer_loss": cfm_loss}, dev=dev)
+        requests_util.patch_req("dryer", dryer_id, body={"scfm_dryer_loss": cfm_loss}, dev=dev)
 
     total_kw = sum(kws)
 
@@ -339,7 +318,7 @@ def start_calculations(operation_period_ids, demand_schedule_id, report_json, ba
 
     for operation_period_id in operation_period_ids:
         print(f"OP ID: {operation_period_id}")
-        op_json = common_functions.get_req("operation_period", operation_period_id, dev)
+        op_json = requests_util.get_req("operation_period", operation_period_id, dev)
         
         row_id = calculate_row(report_json, demand_schedule_id, operation_period_id, op_json, baseline_operation_7_1, dev, scope)
         row_ids.append(row_id)
@@ -350,7 +329,7 @@ def start_calculations(operation_period_ids, demand_schedule_id, report_json, ba
         row_id = calculate_dryer_report(report_json, baseline_operation_7_1, dev)
     row_ids.append(row_id)
 
-    patch_response = common_functions.patch_req("baseline_operation_7_1", baseline_operation_7_1, body={"baseline_operation_7_1_row": row_ids}, dev=dev)
+    patch_response = requests_util.patch_req("baseline_operation_7_1", baseline_operation_7_1, body={"baseline_operation_7_1_row": row_ids}, dev=dev)
     # print(f"PATCH REQ RESPONSE: {patch_response}")
 
 

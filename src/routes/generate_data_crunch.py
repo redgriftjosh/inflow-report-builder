@@ -13,14 +13,14 @@ def upload_op_data_crunch(master_df, report_id, op_id, dev):
     print(master_df.head())
     # Convert the DataFrame to a CSV file
 
-    op_json = common_functions.get_req("operation_period", op_id, dev)
+    op_json = requests_util.get_req("operation_period", op_id, dev)
     try:
         op_name = op_json["response"]["Name"]
     except:
         print(f"Looking for an Operation Periods name... Did you name all your Operation Periods?", file=sys.stderr)
         sys.exit(1)
     
-    common_functions.patch_req("Report", report_id, body={"loading": f"Converting and uploading {op_name}_data_crunch.csv", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Converting and uploading {op_name}_data_crunch.csv", "is_loading_error": "no"}, dev=dev)
     csv_data = master_df.to_csv(index=False)
     num_characters = len(csv_data)
 
@@ -36,7 +36,7 @@ def upload_op_data_crunch(master_df, report_id, op_id, dev):
     # Send to bubble
     requests_util.patch_file_req("data_crunch", encoded_csv_data, f"{op_name}_data_crunch.csv", "operation_period", op_id, dev)
 
-    common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 def upload_raw_data_crunch(master_df, report_id, dev):
     # Fill NaN values with a default value (e.g., 0)
@@ -48,7 +48,7 @@ def upload_raw_data_crunch(master_df, report_id, dev):
     print(master_df.head())
 
     # Convert the DataFrame to a CSV file
-    common_functions.patch_req("Report", report_id, body={"loading": f"Converting and Uploading raw_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Converting and Uploading raw_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
     csv_data = master_df.to_csv(index=False)
     num_characters = len(csv_data)
     # Compress the CSV data
@@ -70,7 +70,7 @@ def upload_trimmed_data_crunch(master_df, report_id, dev):
     print(f"upload_trimmed_data_crunch")
     print(master_df.head())
     # Convert the DataFrame to a CSV file
-    common_functions.patch_req("Report", report_id, body={"loading": f"Converting and Uploading trimmed_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Converting and Uploading trimmed_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
     csv_data = master_df.to_csv(index=False)
 
     compressed_csv_data = gzip.compress(csv_data.encode())
@@ -87,7 +87,7 @@ def upload_exluded_data_crunch(master_df, report_id, dev):
     print(f"upload_exluded_data_crunch")
     print(master_df.head())
     # Convert the DataFrame to a CSV file
-    common_functions.patch_req("Report", report_id, body={"loading": f"Converting and Uploading trimmed_excluded_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Converting and Uploading trimmed_excluded_data_crunch.csv...", "is_loading_error": "no"}, dev=dev)
     csv_data = master_df.to_csv(index=False)
 
     compressed_csv_data = gzip.compress(csv_data.encode())
@@ -101,7 +101,7 @@ def upload_exluded_data_crunch(master_df, report_id, dev):
     requests_util.patch_file_req("data_crunch_trim_exclu", encoded_csv_data, f"trimmed_excluded_data_crunch.csv", "report", report_id, dev)
 
 def add_pressure_to_master_df(master_df, report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     master_df_pressure = None
 
@@ -142,13 +142,13 @@ def generate_data_crunch(dev, report_id):
     df.to_csv("trim_df.csv")
     upload_exluded_data_crunch(df, report_id, dev)
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     if "operation_period" in report_json["response"] and report_json["response"]["operation_period"] != []:
         op_per_type = report_json["response"]["operating_period_type"]
         
         operating_period_ids = report_json["response"]["operation_period"]
-        common_functions.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": f"Found {len(operating_period_ids)} Operating Period{'s' if len(operating_period_ids) != 1 else ''}...", "is_loading_error": "no"}, dev=dev)
     else:
         print(f"No Operating Periods found! You need at least on operation period...", file=sys.stderr)
         sys.exit(1)

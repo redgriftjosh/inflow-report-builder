@@ -2,11 +2,12 @@ import common_functions
 # import math
 from datetime import datetime, timedelta
 import sys
+from utilities import requests_util
 
 # dev = "/version-test"
 # report_id = "1709055608768x171027315936985100"
 # ac_id = "1709057325709x609322153994616800"
-# ac_json = common_functions.get_req("air_compressor", ac_id, dev)
+# ac_json = requests_util.get_req("air_compressor", ac_id, dev)
 # cfm = 500.8
 # volts = 480
 # rated_psig = 115
@@ -30,7 +31,7 @@ import sys
 
 dev = "/version-test"
 report_id = "1706793868748x328693151843483650"
-report_json = common_functions.get_req("report", report_id, dev)
+report_json = requests_util.get_req("report", report_id, dev)
 
 kw_demand_15min = 63.6
 
@@ -43,7 +44,7 @@ try:
 except:
     print(f"Can't find any Electrical Utility info!", file=sys.stderr)
     sys.exit(1)
-elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
+elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
 elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
 on_peak_list = []
@@ -52,7 +53,7 @@ kwh_on_peak_list = []
 kwh_off_peak_list = []
 
 for elec_entry_id in elec_entry_ids:
-    elec_entry_json = common_functions.get_req("electrical_provider_entry", elec_entry_id, dev)
+    elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
     month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
     month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
     kw_on_peak = elec_entry_json["response"]["kw_on_peak"]

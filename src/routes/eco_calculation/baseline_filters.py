@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from eco_calculation import baseline_global
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -41,7 +42,7 @@ def get_report_filters(r_ac_name, report_json, dev):
 
     ac_r_f_ids = []
     for r_f_id in r_f_ids:
-        r_f_json = common_functions.get_req("filter", r_f_id, dev)
+        r_f_json = requests_util.get_req("filter", r_f_id, dev)
         connected_to = r_f_json["response"]["connected_to"]
         connected_to_list = connected_to.split(", ")
         if r_ac_name in connected_to_list:
@@ -54,7 +55,7 @@ def get_filter_psis(f_ids, dev):
     avg_psis = []
 
     for f_id in f_ids:
-        f_json = common_functions.get_req("filter", f_id, dev)
+        f_json = requests_util.get_req("filter", f_id, dev)
         peak_psi = f_json["response"]["peak_psig_drop"]
         peak_psis.append(peak_psi)
 
@@ -65,14 +66,14 @@ def get_filter_psis(f_ids, dev):
 
 
 def get_baseline_filters(r_ac_name, scenario_id, dev):
-    s_json = common_functions.get_req("scenario", scenario_id, dev)
+    s_json = requests_util.get_req("scenario", scenario_id, dev)
     s_baseline_id = s_json["response"]["scenario_baseline"]
-    s_baseline_json = common_functions.get_req("scenario_baseline", s_baseline_id, dev)
+    s_baseline_json = requests_util.get_req("scenario_baseline", s_baseline_id, dev)
     s_f_ids = s_baseline_json["response"]["filter"]
 
     ac_s_f_ids = []
     for s_f_id in s_f_ids:
-        s_f_json = common_functions.get_req("filter", s_f_id, dev)
+        s_f_json = requests_util.get_req("filter", s_f_id, dev)
         connected_to = s_f_json["response"]["connected_to"]
         connected_to_list = connected_to.split(", ")
         if r_ac_name in connected_to_list:
@@ -84,7 +85,7 @@ def get_baseline_filters(r_ac_name, scenario_id, dev):
 def start():
     dev, report_id, scenario_id = get_payload()
 
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
 
     r_ac_ids = report_json["response"]["air_compressor"]
 
@@ -93,7 +94,7 @@ def start():
     for r_ac_id in r_ac_ids:
 
         # Get Compressor Name
-        r_ac_json = common_functions.get_req("air_compressor", r_ac_id, dev)
+        r_ac_json = requests_util.get_req("air_compressor", r_ac_id, dev)
         r_ac_name = r_ac_json["response"]["Customer CA"]
         print("")
         print(f"Compressor: {r_ac_name}")

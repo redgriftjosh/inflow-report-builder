@@ -2,6 +2,7 @@ import os
 import sys
 import json
 from eco_calculation import baseline_global
+from utilities import requests_util
 
 current = os.path.dirname(os.path.realpath(__file__))
 parent = os.path.dirname(current)
@@ -36,21 +37,21 @@ def get_payload():
     return dev, report_id, scenario_id
 
 def create_new_scenario_difference(op_id, dev):
-    response = common_functions.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
+    response = requests_util.post_req("scenario_differences", body={"operation_period": op_id}, dev=dev)
 
     scenario_difference = response["id"]
 
-    common_functions.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
+    requests_util.patch_req("operation_period", op_id, body={"scenario_differences": scenario_difference}, dev=dev)
 
     return scenario_difference
 
 def get_total_report_drain_cfm(report_id, dev):
-    report_json = common_functions.get_req("report", report_id, dev)
+    report_json = requests_util.get_req("report", report_id, dev)
     drain_ids = report_json["response"]["drain"]
 
     adjusted_cfms = []
     for drain_id in drain_ids:
-        drain_json = common_functions.get_req("drain", drain_id, dev)
+        drain_json = requests_util.get_req("drain", drain_id, dev)
 
         try:
             off_min = drain_json["response"]["baseline_off_min"]
@@ -92,15 +93,15 @@ def get_total_report_drain_cfm(report_id, dev):
     return total_report_drain_cfm
 
 def get_total_baseline_drain_cfm(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
     scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_baseline_json = requests_util.get_req("scenario_baseline", scenario_baseline_id, dev)
     drain_ids = scenario_baseline_json["response"]["drain"]
 
     adjusted_cfms = []
     for drain_id in drain_ids:
-        drain_json = common_functions.get_req("drain", drain_id, dev)
+        drain_json = requests_util.get_req("drain", drain_id, dev)
 
         try:
             off_min = drain_json["response"]["baseline_off_min"]
@@ -142,11 +143,11 @@ def get_total_baseline_drain_cfm(scenario_id, dev):
     return total_baseline_drain_cfm
 
 def get_op_ids(scenario_id, dev):
-    scenario_json = common_functions.get_req("scenario", scenario_id, dev)
+    scenario_json = requests_util.get_req("scenario", scenario_id, dev)
 
     scenario_baseline_id = scenario_json["response"]["scenario_baseline"]
 
-    scenario_baseline_json = common_functions.get_req("scenario_baseline", scenario_baseline_id, dev)
+    scenario_baseline_json = requests_util.get_req("scenario_baseline", scenario_baseline_id, dev)
 
     operating_period_ids = scenario_baseline_json["response"]["operation_period"]
 
@@ -163,13 +164,13 @@ def start():
     operating_period_ids = get_op_ids(scenario_id, dev)
 
     for operating_period_id in operating_period_ids:
-        operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+        operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
         try:
             scenario_differences = operating_period_json["response"]["scenario_differences"]
         except:
             scenario_differences = create_new_scenario_difference(operating_period_id, dev)
 
-        common_functions.patch_req("scenario_differences", scenario_differences, body={"drain_cfm_change": total_drain_cfm}, dev=dev)
+        requests_util.patch_req("scenario_differences", scenario_differences, body={"drain_cfm_change": total_drain_cfm}, dev=dev)
 
         baseline_global.update_op_stats(operating_period_id, report_id, dev)
 

@@ -3,43 +3,44 @@ import sys
 import json
 import common_functions
 from datetime import datetime, timedelta
+from utilities import requests_util
 
 # print("All Good")
 # sys.exit()
 
 # Get's the operating period ID so you can pull data you need from it.
 def get_op_id(report_id, operating_period_name, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
 
     if "operation_period" in report_json["response"]:
         operating_period_ids = report_json["response"]["operation_period"]
         
         for operating_period_id in operating_period_ids:
-            operating_period_json = common_functions.get_req("operation_period", operating_period_id, dev)
+            operating_period_json = requests_util.get_req("operation_period", operating_period_id, dev)
             operating_period_name_temp = operating_period_json["response"]["Name"]
             
             if operating_period_name_temp == operating_period_name:
                 focus_op_id = operating_period_id
                 return focus_op_id
             
-        common_functions.patch_req("Report", report_id, body={"loading": "I can't find that operating period for some reason...", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "I can't find that operating period for some reason...", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
                 
     else:
         print(f"Error: No Operating Periods Found! You need at least one Operating Period.", file=sys.stderr)
         sys.exit(1)
-        common_functions.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "No Operating Periods Found! You need at least one Operating Period.", "is_loading_error": "yes"}, dev=dev)
         sys.exit()
 
 def get_pressure_index(report_id, op_json, dev):
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
     baseline_operation_7_1_id = report_json["response"]["baseline_operation_7_1"]
-    baseline_operation_7_1_json = common_functions.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
+    baseline_operation_7_1_json = requests_util.get_req("baseline_operation_7_1", baseline_operation_7_1_id, dev)
 
     try:
         p_what = baseline_operation_7_1_json["response"]["p_what"]
     except:
-        common_functions.patch_req("Report", report_id, body={"loading": "No Pressure Selected gonna skip this part...", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "No Pressure Selected gonna skip this part...", "is_loading_error": "no"}, dev=dev)
         return None
     
     try:
@@ -47,7 +48,7 @@ def get_pressure_index(report_id, op_json, dev):
         pressure = op_json["response"]["P2"][i]
         return pressure
     except:
-        common_functions.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
+        requests_util.patch_req("Report", report_id, body={"loading": "Found a Pressure Log but couldn't work with the name. Make sure it's formatted exactly like P4", "is_loading_error": "no"}, dev=dev)
         return None
 
 def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
@@ -56,7 +57,7 @@ def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
     except:
         print(f"Can't find any Electrical Utility info!", file=sys.stderr)
         sys.exit(1)
-    elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
+    elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
     on_peak_list = []
@@ -65,7 +66,7 @@ def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
     kwh_off_peak_list = []
 
     for elec_entry_id in elec_entry_ids:
-        elec_entry_json = common_functions.get_req("electrical_provider_entry", elec_entry_id, dev)
+        elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
         month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
         month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
         kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
@@ -111,9 +112,9 @@ def calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev):
 
 
 def get_body(op_id, report_id, dev):
-    op_json = common_functions.get_req("operation_period", op_id, dev)
+    op_json = requests_util.get_req("operation_period", op_id, dev)
 
-    report_json = common_functions.get_req("Report", report_id, dev)
+    report_json = requests_util.get_req("Report", report_id, dev)
     peak_15min_acfm = report_json["response"]["15 Min Peak Flow"]
 
     try:
@@ -132,7 +133,7 @@ def get_body(op_id, report_id, dev):
 
     kwh_annual = average_kw_demand * hours_annual
     
-    common_functions.patch_req("Report", report_id, body={"loading": f"Calculating Cost To Operate...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Calculating Cost To Operate...", "is_loading_error": "no"}, dev=dev)
     cost_to_operate = calculate_cost_to_operate(report_json, kw_demand_15min, kwh_annual, dev)
 
     body = {
@@ -168,14 +169,14 @@ def start():
 
     baseline_operation_7_1_row_id = data.get('baseline_operation_7_1_row_id')
 
-    common_functions.patch_req("Report", report_id, body={"loading": f"Getting Data From {operating_period_name}...", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Getting Data From {operating_period_name}...", "is_loading_error": "no"}, dev=dev)
     op_id = get_op_id(report_id, operating_period_name, dev)
 
     body = get_body(op_id, report_id, dev)
     body["label"] = operating_period_name
 
-    common_functions.patch_req("baseline_operation_7_1_row", baseline_operation_7_1_row_id, body, dev)
-    common_functions.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
+    requests_util.patch_req("baseline_operation_7_1_row", baseline_operation_7_1_row_id, body, dev)
+    requests_util.patch_req("Report", report_id, body={"loading": f"Success!", "is_loading_error": "no"}, dev=dev)
 
 
 

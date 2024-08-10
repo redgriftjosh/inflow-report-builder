@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import sys
 from routes import common_functions
+from utilities import requests_util
 
 
 
@@ -10,7 +11,7 @@ def get_cost_to_operate(report_json, kw_demand_15min, kwh_annual, demand_schedul
     except:
         print(f"Can't find any Electrical Utility info!", file=sys.stderr)
         sys.exit(1)
-    elec_provider_json = common_functions.get_req("electrical_provider", elec_provider_id, dev)
+    elec_provider_json = requests_util.get_req("electrical_provider", elec_provider_id, dev)
     elec_entry_ids = elec_provider_json["response"]["electrical_provider_entry"]
 
     on_peak_list = []
@@ -19,7 +20,7 @@ def get_cost_to_operate(report_json, kw_demand_15min, kwh_annual, demand_schedul
     kwh_off_peak_list = []
 
     for elec_entry_id in elec_entry_ids:
-        elec_entry_json = common_functions.get_req("electrical_provider_entry", elec_entry_id, dev)
+        elec_entry_json = requests_util.get_req("electrical_provider_entry", elec_entry_id, dev)
         month_start = datetime.strptime(elec_entry_json["response"]["month_start"], "%B").month
         month_end = datetime.strptime(elec_entry_json["response"]["month_end"], "%B").month
         kw_on_peak = elec_entry_json["response"]["kw_on_peak"]
