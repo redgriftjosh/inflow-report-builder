@@ -24,7 +24,8 @@ def get_order_height(hist_id, ac_ids, dev):
 def create_hist_2min_peak(order_height, hist_id, acfms, colours, height, dev):
 
     # I have no idea how this works. I assembled it through trial and error but I do not fully understand it.
-
+    print("acfms-------------------")
+    print(acfms)
     hist_values = acfms
 
     temp_hist_values = []
@@ -196,32 +197,53 @@ def create_hist(order_height, hist_id, acfms, colours, height, dev):
     print(total_acfm)
 
 def acfm_2min_peak_values(dfs, op_id, report_id, dev):
-    report_json = requests_util.get_req("report", report_id, dev)
-    op_per_type = report_json["response"]["operating_period_type"]
+    acfms = []
+
+    report_json = requests_util.get_req("operation_period", op_id, dev)
+    dataset_ids = report_json["response"]["dataset_7_2"]
+
+    for dataset_id in dataset_ids:
+            dataset_json = requests_util.get_req("dataset_7_2", dataset_id, dev)
+            acfms.append(dataset_json["response"]["peak-2-acfm"])
+
+    return acfms
+    # for idx, ac_id in enumerate(ac_ids):
+    #     ac_json = requests_util.get_req("air_compressor", ac_id, dev)
+    #     print(ac_json)
+
+
+    # op_per_type = report_json["response"]["operating_period_type"]
     
-    if op_per_type == "Daily":
-        acfms = []
-        for df in dfs:
-            period_data = common_functions.daily_operating_period(df, op_id, dev) # Filter dataframe to operating period
-            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-            acfms.append(max_avg_2)
-        return acfms
+    # print(f"report_json: {report_json}")
+    # print(f"op_per_type: {op_per_type}")
 
-    elif op_per_type == "Weekly":
-        acfms = []
-        for df in dfs:
-            period_data = common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
-            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-            acfms.append(max_avg_2)
-        return acfms
+    # if op_per_type == "Daily":
+    #     acfms = []
+    #     for df in dfs:
+    #         period_data = common_functions.daily_operating_period(df, op_id, dev) # Filter dataframe to operating period
+    #         max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+    #         acfms.append(max_avg_2)
+    #     return acfms
 
-    elif op_per_type == "Experimental":
-        acfms = []
-        for df in dfs:
-            period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
-            max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
-            acfms.append(max_avg_2)
-        return acfms
+    # elif op_per_type == "Weekly":
+    #     acfms = []
+    #     for df in dfs:
+    #         period_data = common_functions.weekly_operating_period(df, op_id, dev) # Filter dataframe to operating period
+    #         max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+    #         acfms.append(max_avg_2)
+    #     return acfms
+
+    # if op_per_type == "Experimental":
+        
+    #     for df in dfs:
+
+    #         # for idx, ac in enumerate(ac_ids):
+    #         #     peak_2_acfm_index = df['2_Min_Avg_Flow'].idxmax() # Get the index of the max TOTAL peak 15 minute average flow
+    #         #     peak_2_acfm = df.at[peak_2_acfm_index, f"2_Min_Avg_Flow_AC{idx+1}"]
+    #         period_data = common_functions.experimental_operating_period(df, op_id, dev) # Filter dataframe to operating period
+    #         max_avg_2 = period_data.filter(like='ACFM').sum(axis=1)[::-1].rolling(window=10, min_periods=10).mean()[::-1].fillna(0).max()
+    #         acfms.append(max_avg_2)
+    #     return acfms
 
 def acfm_values(dfs, op_id, report_id, dev):
     report_json = requests_util.get_req("report", report_id, dev)
@@ -427,9 +449,10 @@ def start():
     print(f"hist_2min_peak_id: {hist_2min_peak_id}")
 
     dfs = get_df_for_each_ac(ac_ids, report_id, dev)
+    print(f"dfs: {dfs}")
     acfms = acfm_values(dfs, op_id, report_id, dev) # returns acfm per ac list = [432, 234, 234]
-    print(f"acfms: {acfms}")
     max_avg_2_acfms = acfm_2min_peak_values(dfs, op_id, report_id, dev)
+    print(f"max_avg_2_acfms: {max_avg_2_acfms}")
 
     hist_height = get_heighest_hist(acfms, max_avg_2_acfms)
 

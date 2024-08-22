@@ -51,7 +51,8 @@ def calculate_values(df, operating_period_id, report_json, dev):
         print(f"AC{idx+1}")
         print(f"peak_15_acfm_index: {peak_15_acfm_index}")
         print(f"peak_15_kw_index: {peak_15_kw_index}")
-
+        print(f"peak_2_acfm: {peak_2_acfm}")
+        
         # ready for webhook
         body = {
             "kw": avg_kilowatts,
@@ -104,6 +105,7 @@ def start():
 
     report_id = data.get('report-id')
     report_json = requests_util.get_req("Report", report_id, dev)
+    print(report_json)
     requests_util.patch_req("Report", report_id, body={"loading": "Making sure your charts are set up to display all the data...", "is_loading_error": "no"}, dev=dev)
     reset_dataset_7_2.start(report_id, report_json, dev)
     loop_through_operating_periods(report_id, report_json, dev)
