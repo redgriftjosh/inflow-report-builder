@@ -103,7 +103,7 @@ def start():
     else:
         dev = ''
 
-    report_id = data.get('report-id')
+    report_id = data.get('report_id')
     report_json = requests_util.get_req("Report", report_id, dev)
     print(report_json)
     requests_util.patch_req("Report", report_id, body={"loading": "Making sure your charts are set up to display all the data...", "is_loading_error": "no"}, dev=dev)
